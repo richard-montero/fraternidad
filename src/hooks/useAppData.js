@@ -92,12 +92,14 @@ export function useAppData(sesion) {
 
   const acciones = {
     crearSocio: (datos) => accion(() => api.crearSocio(datos)),
+    editarSocio: (id, datos) => accion(() => api.editarSocio(id, datos)),
     toggleEstadoSocio: (socio) => accion(() => api.toggleEstadoSocio(socio)),
     cambiarRolSocio: (id, rol) => accion(() => api.cambiarRolSocio(id, rol)),
     enviarRestablecimientoPassword: (email) => api.enviarRestablecimientoPassword(email),
     crearObligacionPatrimonial: (socioId, monto, fecha) => accion(() => api.crearObligacionPatrimonial(socioId, monto, fecha)),
     registrarPagoPatrimonial: (socioId, monto, fecha, concepto) => accion(() => api.registrarPagoPatrimonial(socioId, monto, fecha, concepto)),
     registrarPagoMensual: (socioId, monto, fecha, concepto) => accion(() => api.registrarPagoMensual(socioId, monto, fecha, concepto)),
+    registrarAjuste: (tabla, socioId, monto, fecha, concepto, tipo) => accion(() => api.registrarAjuste(tabla, socioId, monto, fecha, concepto, tipo)),
     generarMensualidades: async (anio, mes) => {
       const r = await api.generarMensualidades(anio, mes, socios, configAnual);
       recargar();
@@ -106,6 +108,8 @@ export function useAppData(sesion) {
     guardarCuotaAnual: (anio, cuota) => accion(() => api.guardarCuotaAnual(anio, cuota)),
     registrarAporteVoluntario: (socioId, monto, fecha, concepto, observaciones) => accion(() => api.registrarAporteVoluntario(socioId, monto, fecha, concepto, observaciones)),
     registrarGasto: (gasto, archivo) => accion(() => api.registrarGasto(gasto, archivo)),
+    editarGasto: (id, gasto) => accion(() => api.editarGasto(id, gasto)),
+    eliminarGasto: (id) => accion(() => api.eliminarGasto(id)),
     obtenerUrlComprobante: (ruta) => api.obtenerUrlComprobante(ruta),
   };
 

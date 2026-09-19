@@ -91,6 +91,14 @@ export async function cambiarRolSocio(socioId, nuevoRol) {
   if (error) throw error;
 }
 
+export async function editarSocio(socioId, { nombre, celular, email }) {
+  const { error } = await supabase
+    .from("socios")
+    .update({ nombre: nombre.trim(), celular: celular.trim(), email: email.trim() })
+    .eq("id", socioId);
+  if (error) throw error;
+}
+
 // No existe forma de fijar directamente la contraseña de OTRO usuario usando
 // solo la llave pública (eso requeriría una llave secreta / Edge Function,
 // que decidimos no usar). En su lugar, enviamos un enlace de restablecimiento
@@ -161,6 +169,16 @@ export async function listarMovimientos(tabla) {
 
 export async function registrarPagoMensual(socioId, monto, fecha, concepto) {
   await registrarMovimiento("movimientos_mensuales", socioId, fecha, concepto, 0, monto);
+}
+
+// Ajuste manual (corrección o anulación) sobre el mayor patrimonial o mensual.
+// No se editan ni se borran movimientos existentes — se agrega un asiento
+// compensatorio, para conservar el historial completo como en un libro
+// contable real.
+export async function registrarAjuste(tabla, socioId, monto, fecha, concepto, tipo) {
+  const debe = tipo === "debe" ? monto : 0;
+  const haber = tipo === "haber" ? monto : 0;
+  await registrarMovimiento(tabla, socioId, fecha, concepto, debe, haber);
 }
 
 // ---------- Mensualidades generadas ----------
@@ -248,6 +266,28 @@ export async function registrarGasto(gasto, archivo) {
     forma_pago: gasto.formaPago,
     comprobante_ruta: comprobanteRuta,
   });
+  if (error) throw error;
+}
+
+// Editar y eliminar gasto requieren la política adicional de
+// supabase/03_mejoras.sql (solo súper administrador).
+export async function editarGasto(gastoId, gasto) {
+  const { error } = await supabase
+    .from("gastos")
+    .update({
+      fecha: gasto.fecha,
+      categoria: gasto.categoria,
+      concepto: gasto.concepto,
+      beneficiario: gasto.beneficiario,
+      monto: gasto.monto,
+      forma_pago: gasto.formaPago,
+    })
+    .eq("id", gastoId);
+  if (error) throw error;
+}
+
+export async function eliminarGasto(gastoId) {
+  const { error } = await supabase.from("gastos").delete().eq("id", gastoId);
   if (error) throw error;
 }
 

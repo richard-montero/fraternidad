@@ -31,6 +31,49 @@ adjunto, reportes y configuración anual.
 
 ---
 
+## 🆕 Mejoras de esta versión
+
+**Corrección de fondo:** el proyecto usaba clases de Tailwind CSS
+(`flex`, `grid`, `gap-3.5`, etc.) en todo el diseño, pero Tailwind nunca se
+instaló como dependencia. Por eso en Netlify el menú lateral y el contenido
+no quedaban realmente en fila, ni las grillas de tarjetas funcionaban — todo
+dependía únicamente de los estilos en línea. Ya quedó instalado y
+configurado correctamente (ver `vite.config.js` y `src/index.css`).
+
+**Diseño:**
+- Menú lateral fijo en pantallas grandes; en el celular se convierte en un
+  panel deslizante con botón de menú, con una barra superior propia.
+- Tablas largas con scroll horizontal en pantallas angostas, para que nunca
+  se rompan.
+- Avisos ("toasts") para confirmar acciones, además de los mensajes en cada
+  formulario.
+- Cuadros de confirmación antes de acciones sensibles (desactivar un socio,
+  eliminar un gasto, generar mensualidades).
+- Barras comparativas simples en el Panel general y en Reportes (ingresos
+  por origen, ingresos vs. egresos, egresos por categoría).
+- Etiquetas de formulario conectadas a su campo (accesibilidad), botón para
+  mostrar/ocultar la contraseña en el login, favicon y tipografía
+  precargada.
+
+**Funciones nuevas:**
+- **Editar datos de un socio** (nombre, celular, correo) desde "Socios → Gestionar".
+- **Ajuste / anulación** en el mayor patrimonial y en el de mensualidades:
+  agrega un asiento de corrección sin borrar el historial (útil si se
+  registró mal un monto).
+- **Editar y eliminar un gasto** (solo súper administrador) — requiere
+  ejecutar el nuevo script `supabase/03_mejoras.sql` (ver Parte 1, Paso 7).
+- **Exportar a CSV** desde Libro de ingresos, Libro de gastos y Reportes.
+- **Imprimir / guardar como PDF** el reporte del período, con un botón
+  dedicado.
+- Búsqueda y **orden de columnas** (clic en el encabezado) en Socios,
+  Ingresos y Gastos, con paginación "Mostrar más" para historiales largos.
+
+Nada de esto cambia el esquema de datos existente: tu base de datos de
+Supabase actual sigue funcionando igual, solo se agregan dos permisos
+nuevos y unos índices (paso 7 abajo).
+
+---
+
 ## PARTE 1 — Configurar la base de datos en Supabase
 
 ### Paso 1: Crear el proyecto
@@ -76,6 +119,14 @@ este software, pero consérvala).
 2. Copia el **Project URL**.
 3. Copia la **Publishable key** (también llamada "anon / public key").
    Guarda las dos, las necesitas en la Parte 2.
+
+### Paso 7: Ejecutar el script de mejoras (nuevo)
+1. Vuelve a **SQL Editor** → **New query**.
+2. Abre `supabase/03_mejoras.sql`, copia todo su contenido y pégalo.
+3. Presiona **Run**. Esto habilita que un súper administrador pueda editar o
+   eliminar un gasto ya registrado, y agrega índices para que los libros
+   contables carguen rápido aunque crezca el historial. Si ya tenías la base
+   de datos configurada de antes (Pasos 2–6), solo te falta este paso.
 
 ---
 
@@ -138,6 +189,8 @@ tocar el código.
 3. Editar el correo en `supabase/02_crear_admin.sql` y ejecutarlo.
 4. Crear el bucket privado `comprobantes-gastos` en Storage.
 5. Copiar el Project URL y la Publishable key desde Project Settings → API.
+5.b. Ejecutar `supabase/03_mejoras.sql` (nuevo — habilita editar/eliminar
+   gastos y agrega índices).
 
 **En Netlify:**
 6. Pegar esas dos claves como variables de entorno (o en un archivo `.env`
