@@ -143,6 +143,18 @@ Cómo funciona:
   se crea automáticamente esa obligación patrimonial para ese socio.
 - En la hoja Aportes, la columna "Celular" debe coincidir con el celular
   de un socio ya existente o recién creado en la hoja Socios.
+- La hoja Aportes distingue **dos cosas distintas** para lo mensual:
+  - **"Obligación mensual"** — lo que se le *cargó* al socio ese mes
+    (lado Debe). Usa el año y mes de la columna Fecha. Si ese socio ya
+    tenía ese mes marcado como generado, la fila se omite para no
+    duplicar (y ya no aparecerá disponible para "Generar mensualidades"
+    en Configuración).
+  - **"Mensual"** — el *pago* que hizo el socio (lado Haber). Igual que
+    "Patrimonial" y "Voluntario".
+  - Para reconstruir el historial completo de un mes, normalmente pones
+    una fila de "Obligación mensual" (lo que se le cargó) y, si ya pagó,
+    otra fila de "Mensual" (lo que pagó) — la hoja "Instrucciones" de la
+    plantilla trae el detalle y un ejemplo de las dos juntas.
 - Si no eres súper administrador, todo socio nuevo se crea como
   Patrimonial/Socio sin importar lo que diga el Excel (misma regla que el
   formulario manual).

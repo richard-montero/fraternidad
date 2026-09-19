@@ -174,6 +174,32 @@ export async function registrarPagoMensual(socioId, monto, fecha, concepto) {
   await registrarMovimiento("movimientos_mensuales", socioId, fecha, concepto, 0, monto);
 }
 
+// Crea la obligación (Debe) de un mes puntual para UN solo socio — a
+// diferencia de generarMensualidades(), que genera el mes para todos los
+// socios activos a la vez con la cuota configurada. Esta función es para
+// cargar historial (por ejemplo, desde la importación de Excel), mes por
+// mes y socio por socio, con el monto exacto que corresponda a cada caso.
+// Si ese socio ya tiene ese mes marcado como generado, no hace nada (evita
+// duplicar) y lo informa con yaExistia: true.
+export async function crearObligacionMensualHistorica(socioId, anio, mes, monto, concepto) {
+  const { data: existente, error: errCheck } = await supabase
+    .from("obligaciones_mensuales_generadas")
+    .select("id")
+    .eq("socio_id", socioId).eq("anio", anio).eq("mes", mes)
+    .maybeSingle();
+  if (errCheck) throw errCheck;
+  if (existente) return { yaExistia: true };
+
+  const { error: errInsertObl } = await supabase
+    .from("obligaciones_mensuales_generadas")
+    .insert({ socio_id: socioId, anio, mes });
+  if (errInsertObl) throw errInsertObl;
+
+  const fecha = `${anio}-${String(mes).padStart(2, "0")}-01`;
+  await registrarMovimiento("movimientos_mensuales", socioId, fecha, concepto, monto, 0);
+  return { yaExistia: false };
+}
+
 // Ajuste manual (corrección o anulación) sobre el mayor patrimonial o mensual.
 // No se editan ni se borran movimientos existentes — se agrega un asiento
 // compensatorio, para conservar el historial completo como en un libro

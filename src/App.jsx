@@ -2294,7 +2294,10 @@ function ImportadorExcel({ ctx }) {
       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
         Sube un Excel con hasta 3 hojas — <b>Socios</b>, <b>Aportes</b> y <b>Gastos</b> — para cargar
         varios registros de una sola vez. Los socios se identifican por su celular: si el celular ya
-        existe, esa fila se omite (no se duplica).
+        existe, esa fila se omite (no se duplica). En Aportes, usa el tipo <b>"Obligación mensual"</b>{" "}
+        para cargar lo que se le cargó al socio ese mes (Debe), y <b>"Mensual"</b> para el pago que hizo
+        (Haber) — son dos cosas distintas. La hoja "Instrucciones" de la plantilla explica cada valor
+        permitido.
         {!esSuperadmin && " Como no eres súper administrador, todos los socios nuevos se crearán como Patrimonial / Socio, sin importar lo que diga el Excel."}
       </p>
 
@@ -2330,7 +2333,8 @@ function ImportadorExcel({ ctx }) {
           <div className="grid gap-3.5 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
             <StatCard label="Socios creados" value={resultado.sociosCreados} tono="positivo" />
             <StatCard label="Socios ya existentes (omitidos)" value={resultado.sociosExistentes} />
-            <StatCard label="Aportes registrados" value={resultado.aportesCreados} tono="positivo" />
+            <StatCard label="Obligaciones mensuales generadas" value={resultado.obligacionesMensualesGeneradas} tono="positivo" />
+            <StatCard label="Aportes (pagos) registrados" value={resultado.aportesCreados} tono="positivo" />
             <StatCard label="Gastos registrados" value={resultado.gastosCreados} tono="positivo" />
           </div>
           {resultado.errores.length > 0 && (

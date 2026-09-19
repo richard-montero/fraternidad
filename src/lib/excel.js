@@ -21,6 +21,27 @@ export function exportarExcel(nombreArchivo, hojas) {
 export function descargarPlantillaImportacion() {
   exportarExcel("plantilla_importacion_fraternidad", [
     {
+      nombre: "Instrucciones",
+      columnas: [
+        { label: "Hoja", get: (f) => f.hoja },
+        { label: "Columna", get: (f) => f.columna },
+        { label: "Valores permitidos / formato", get: (f) => f.valores },
+      ],
+      filas: [
+        { hoja: "Socios", columna: "Estado", valores: "Patrimonial / Invitado / De baja (si se deja vacío: Patrimonial)" },
+        { hoja: "Socios", columna: "Rol", valores: "Socio / Supervisor / Administrador / Súper administrador (si se deja vacío: Socio)" },
+        { hoja: "Socios", columna: "Fecha de nacimiento", valores: "AAAA-MM-DD" },
+        { hoja: "Socios", columna: "Aporte patrimonial acordado", valores: "Opcional — si se llena, crea automáticamente esa obligación patrimonial" },
+        { hoja: "Aportes", columna: "Tipo", valores: "Patrimonial / Mensual / Voluntario / Obligación mensual" },
+        { hoja: "Aportes", columna: "Tipo = Patrimonial o Mensual", valores: "Registra un PAGO (Haber) — reduce lo pendiente del socio" },
+        { hoja: "Aportes", columna: "Tipo = Obligación mensual", valores: "Registra lo que se le CARGÓ al socio ese mes (Debe) — usa el año y mes de la columna Fecha. No confundir con un pago." },
+        { hoja: "Aportes", columna: "Fecha", valores: "AAAA-MM-DD" },
+        { hoja: "Gastos", columna: "Categoria", valores: "Sueldos y salarios / Servicios básicos — Saguapac / Servicios básicos — Cre / Internet y telefonía / Mantenimientos / Otros" },
+        { hoja: "Gastos", columna: "Fecha", valores: "AAAA-MM-DD" },
+        { hoja: "(todas)", columna: "Celular", valores: "Debe coincidir exactamente entre las hojas Socios y Aportes para emparejar cada fila con su socio" },
+      ],
+    },
+    {
       nombre: "Socios",
       columnas: [
         { label: "Nombre completo", get: (f) => f.nombre },
@@ -48,7 +69,8 @@ export function descargarPlantillaImportacion() {
       ],
       filas: [
         { celular: "71234567", tipo: "Patrimonial", fecha: "2024-03-10", monto: 1000, concepto: "Pago patrimonial", observaciones: "" },
-        { celular: "71234567", tipo: "Mensual", fecha: "2024-03-10", monto: 50, concepto: "Mensualidad marzo 2024", observaciones: "" },
+        { celular: "71234567", tipo: "Obligación mensual", fecha: "2024-02-01", monto: 50, concepto: "Mensualidad febrero 2024", observaciones: "" },
+        { celular: "71234567", tipo: "Mensual", fecha: "2024-02-05", monto: 50, concepto: "Pago mensualidad febrero 2024", observaciones: "" },
       ],
     },
     {

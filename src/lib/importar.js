@@ -73,7 +73,7 @@ function esperar(ms) {
  * - onProgreso(hechos, total): callback opcional para una barra de avance.
  */
 export async function importarDatos({ libro, socios, esSuperadmin, estados, roles, categoriasGasto, onProgreso }) {
-  const resultado = { sociosCreados: 0, sociosExistentes: 0, obligacionesCreadas: 0, aportesCreados: 0, gastosCreados: 0, errores: [] };
+  const resultado = { sociosCreados: 0, sociosExistentes: 0, obligacionesCreadas: 0, obligacionesMensualesGeneradas: 0, aportesCreados: 0, gastosCreados: 0, errores: [] };
 
   const mapaCelular = new Map();
   socios.forEach((s) => mapaCelular.set(normalizar(s.celular), s.id));
@@ -159,8 +159,19 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
       if (tipoTxt === "patrimonial") await api.registrarPagoPatrimonial(socioId, monto, fecha, concepto);
       else if (tipoTxt === "mensual") await api.registrarPagoMensual(socioId, monto, fecha, concepto);
       else if (tipoTxt === "voluntario") await api.registrarAporteVoluntario(socioId, monto, fecha, concepto, observaciones);
-      else {
-        resultado.errores.push(`Aportes, fila ${i + 2}: el tipo "${campo(fila, "Tipo")}" no se reconoce (usa Patrimonial, Mensual o Voluntario).`);
+      else if (tipoTxt === "obligacion mensual" || tipoTxt === "cargo mensual" || tipoTxt === "mensualidad generada") {
+        const [anioStr, mesStr] = fecha.split("-");
+        const r = await api.crearObligacionMensualHistorica(socioId, Number(anioStr), Number(mesStr), monto, concepto);
+        if (r.yaExistia) {
+          resultado.errores.push(`Aportes, fila ${i + 2}: ese socio ya tenía una obligación mensual generada para ${mesStr}/${anioStr} — se omitió para no duplicar.`);
+          avanzar();
+          continue;
+        }
+        resultado.obligacionesMensualesGeneradas++;
+        avanzar();
+        continue;
+      } else {
+        resultado.errores.push(`Aportes, fila ${i + 2}: el tipo "${campo(fila, "Tipo")}" no se reconoce (usa Patrimonial, Mensual, Voluntario u Obligación mensual).`);
         avanzar();
         continue;
       }
