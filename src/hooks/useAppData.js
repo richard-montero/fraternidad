@@ -18,6 +18,7 @@ export function useAppData(sesion) {
   const [oblMensualesGeneradas, setOblMensualesGeneradas] = useState([]);
   const [aportesVoluntarios, setAportesVoluntarios] = useState([]);
   const [gastos, setGastos] = useState([]);
+  const [ingresosExternos, setIngresosExternos] = useState([]);
 
   const recargar = useCallback(() => setRecargarContador((c) => c + 1), []);
 
@@ -27,6 +28,8 @@ export function useAppData(sesion) {
     setCargando(true);
     setError(null);
 
+    const puedeVer = sesion.rol !== "socio";
+
     Promise.all([
       api.listarSocios(),
       api.listarConfigAnual(),
@@ -35,9 +38,10 @@ export function useAppData(sesion) {
       api.listarMovimientos("movimientos_mensuales"),
       api.listarObligacionesMensualesGeneradas(),
       api.listarAportesVoluntarios(),
-      sesion.rol !== "socio" ? api.listarGastos() : Promise.resolve([]),
+      puedeVer ? api.listarGastos() : Promise.resolve([]),
+      puedeVer ? api.listarIngresosExternos() : Promise.resolve([]),
     ])
-      .then(([s, ca, op, mp, mm, omg, av, g]) => {
+      .then(([s, ca, op, mp, mm, omg, av, g, ie]) => {
         if (cancelado) return;
         setSocios(s);
         setConfigAnual(ca);
@@ -47,6 +51,7 @@ export function useAppData(sesion) {
         setOblMensualesGeneradas(omg);
         setAportesVoluntarios(av);
         setGastos(g);
+        setIngresosExternos(ie);
       })
       .catch((e) => { if (!cancelado) setError(e.message || "Ocurrió un error al cargar los datos."); })
       .finally(() => { if (!cancelado) setCargando(false); });
@@ -81,7 +86,9 @@ export function useAppData(sesion) {
     return lista.sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
   }, [movPatrimoniales, movMensuales, aportesVoluntarios]);
 
-  const totalIngresos = ingresosConsolidados.reduce((a, b) => a + b.monto, 0);
+  const totalIngresosSocios = ingresosConsolidados.reduce((a, b) => a + b.monto, 0);
+  const totalIngresosExternos = ingresosExternos.reduce((a, b) => a + Number(b.monto), 0);
+  const totalIngresos = totalIngresosSocios + totalIngresosExternos;
   const totalGastos = gastos.reduce((a, b) => a + Number(b.monto), 0);
 
   // ---------- Acciones (envuelven la API y recargan al terminar) ----------
@@ -93,7 +100,7 @@ export function useAppData(sesion) {
   const acciones = {
     crearSocio: (datos) => accion(() => api.crearSocio(datos)),
     editarSocio: (id, datos) => accion(() => api.editarSocio(id, datos)),
-    toggleEstadoSocio: (socio) => accion(() => api.toggleEstadoSocio(socio)),
+    cambiarEstadoSocio: (id, estado) => accion(() => api.cambiarEstadoSocio(id, estado)),
     cambiarRolSocio: (id, rol) => accion(() => api.cambiarRolSocio(id, rol)),
     enviarRestablecimientoPassword: (email) => api.enviarRestablecimientoPassword(email),
     crearObligacionPatrimonial: (socioId, monto, fecha) => accion(() => api.crearObligacionPatrimonial(socioId, monto, fecha)),
@@ -111,6 +118,9 @@ export function useAppData(sesion) {
     editarGasto: (id, gasto) => accion(() => api.editarGasto(id, gasto)),
     eliminarGasto: (id) => accion(() => api.eliminarGasto(id)),
     obtenerUrlComprobante: (ruta) => api.obtenerUrlComprobante(ruta),
+    registrarIngresoExterno: (datos) => accion(() => api.registrarIngresoExterno(datos)),
+    editarIngresoExterno: (id, datos) => accion(() => api.editarIngresoExterno(id, datos)),
+    eliminarIngresoExterno: (id) => accion(() => api.eliminarIngresoExterno(id)),
   };
 
   return {
@@ -124,7 +134,10 @@ export function useAppData(sesion) {
     oblMensualesGeneradas,
     aportesVoluntarios,
     gastos,
+    ingresosExternos,
     ingresosConsolidados,
+    totalIngresosSocios,
+    totalIngresosExternos,
     totalIngresos,
     totalGastos,
     saldoPatrimonial,

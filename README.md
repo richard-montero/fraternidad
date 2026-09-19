@@ -74,6 +74,56 @@ nuevos y unos índices (paso 7 abajo).
 
 ---
 
+## 🆕 Cambios solicitados (segunda ronda)
+
+**Socios:**
+- Se agregó **fecha de nacimiento**.
+- El estado del socio ahora es **Patrimonial / Invitado / De baja**
+  (reemplaza a Activo/Inactivo). Solo un **súper administrador** puede
+  cambiarlo — la regla está aplicada dentro de la base de datos, así que
+  se cumple aunque alguien intente saltarse la interfaz.
+- A un socio **de baja** ya no se le generan mensualidades nuevas al usar
+  "Generar mensualidades".
+
+**Nuevo rol — Supervisor:**
+- Ve el Panel general, Socios, Libro de ingresos, Libro de gastos y
+  Reportes, y puede generar/exportar/imprimir todos los reportes.
+- No puede crear, editar ni eliminar nada — ni siquiera si manipula la
+  aplicación directamente, porque la base de datos rechaza esos cambios a
+  nivel de permisos (RLS), no solo se ocultan los botones.
+
+**Ingresos institucionales (que no provienen de socios):**
+- Nueva pestaña "Ingreso institucional" en el Libro de ingresos, con tres
+  orígenes: Alquiler/uso de instalaciones, Donaciones, Otros.
+- Aparecen junto con los aportes de socios en el mismo libro, mezclados
+  y a la vez diferenciados con una etiqueta, y se incluyen en todos los
+  reportes generales.
+
+**Gastos reclasificados:**
+Sueldos y salarios · Servicios básicos — Saguapac · Servicios básicos — Cre
+· Internet y telefonía · Mantenimientos · Otros.
+Los gastos históricos con la categoría anterior siguen mostrando una
+etiqueta legible automáticamente (no hace falta volver a clasificarlos).
+
+**Reportes — ahora con 7 pestañas, todas imprimibles y exportables a Excel
+(.xlsx real) y CSV:**
+1. Resumen general (el que ya existía, ahora incluye ingresos institucionales)
+2. Ingresos de socios (mensual / anual / rango de fechas)
+3. Detalle de pagos por socio, con subtotales de Patrimonial / Mensual /
+   Voluntario
+4. Movimientos de ingresos — Resumen y Detalle
+5. Movimientos de egresos — Resumen y Detalle
+6. Resumen mensual y anual de ingresos y egresos (las 12 filas del año)
+7. Estado de resultado por gestión (ingresos − egresos = resultado del
+   ejercicio, para el año que elijas)
+
+"Exportar a PDF" se hace con el botón **Imprimir / PDF** de cada reporte:
+abre el diálogo de impresión del navegador, donde puedes elegir "Guardar
+como PDF" — así el PDF sale siempre con el diseño ya ajustado para
+imprimir, sin depender de una librería adicional.
+
+---
+
 ## PARTE 1 — Configurar la base de datos en Supabase
 
 ### Paso 1: Crear el proyecto
@@ -120,13 +170,28 @@ este software, pero consérvala).
 3. Copia la **Publishable key** (también llamada "anon / public key").
    Guarda las dos, las necesitas en la Parte 2.
 
-### Paso 7: Ejecutar el script de mejoras (nuevo)
+### Paso 7: Ejecutar el script de mejoras
 1. Vuelve a **SQL Editor** → **New query**.
 2. Abre `supabase/03_mejoras.sql`, copia todo su contenido y pégalo.
 3. Presiona **Run**. Esto habilita que un súper administrador pueda editar o
    eliminar un gasto ya registrado, y agrega índices para que los libros
    contables carguen rápido aunque crezca el historial. Si ya tenías la base
    de datos configurada de antes (Pasos 2–6), solo te falta este paso.
+
+### Paso 8: Ejecutar el script de cambios (nuevo)
+1. Vuelve a **SQL Editor** → **New query**.
+2. Abre `supabase/04_cambios.sql`, copia todo su contenido y pégalo.
+3. Presiona **Run**. Este script agrega:
+   - Fecha de nacimiento del socio.
+   - Los nuevos estados de socio (Patrimonial / Invitado / De baja), migrando
+     automáticamente los valores que ya tenías (Activo → Patrimonial,
+     Inactivo → De baja).
+   - El nuevo rol Supervisor.
+   - La tabla de ingresos que no provienen de socios (alquiler, donaciones,
+     otros).
+   - La regla de que solo un súper administrador puede cambiar el estado o
+     el rol de un socio (aplicada dentro de la base de datos, no solo en la
+     pantalla).
 
 ---
 
@@ -169,11 +234,13 @@ tocar el código.
 2. Inicia sesión con el correo y contraseña que definiste en el Paso 3.
 3. Ve a **Socios** → **Nuevo socio** para registrar a los demás miembros de
    la fraternidad. Como eres súper administrador, puedes elegir su rol
-   (Socio / Administrador / Súper administrador) y, si quieres, una
+   (Socio / Supervisor / Administrador / Súper administrador) y, si
+   quieres, una
    contraseña para esa persona; si la dejas en blanco, será `123456` y se
    recomienda que la cambien luego con "Enviar enlace de restablecimiento".
 4. Desde **Configuración anual**, define la cuota mensual del año y genera
-   las mensualidades para todos los socios activos.
+   las mensualidades para los socios (los que estén "de baja" no reciben
+   mensualidades nuevas).
 5. Registra pagos desde **Libro de ingresos**, o desde la ficha de cada
    socio.
 6. Registra gastos con su comprobante desde **Libro de gastos**.
@@ -189,8 +256,10 @@ tocar el código.
 3. Editar el correo en `supabase/02_crear_admin.sql` y ejecutarlo.
 4. Crear el bucket privado `comprobantes-gastos` en Storage.
 5. Copiar el Project URL y la Publishable key desde Project Settings → API.
-5.b. Ejecutar `supabase/03_mejoras.sql` (nuevo — habilita editar/eliminar
-   gastos y agrega índices).
+5.b. Ejecutar `supabase/03_mejoras.sql` (habilita editar/eliminar gastos y
+   agrega índices).
+5.c. Ejecutar `supabase/04_cambios.sql` (nuevo — fecha de nacimiento, nuevos
+   estados de socio, rol Supervisor, ingresos institucionales).
 
 **En Netlify:**
 6. Pegar esas dos claves como variables de entorno (o en un archivo `.env`

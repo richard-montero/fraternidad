@@ -11,18 +11,17 @@
 --   4. Pega este script completo en el SQL Editor y presiona RUN.
 -- =====================================================================
 
-insert into public.socios (auth_user_id, nombre, celular, email, codigo, estado, rol)
+insert into public.socios (auth_user_id, nombre, celular, email, codigo, rol)
 select
   id,
   'Administrador',
   '00000000',
   'REEMPLAZA-CON-TU-CORREO@ejemplo.com',   -- 👈 cambia este correo
   'S-ADMIN001',
-  'activo',
   'superadmin'
 from auth.users
 where email = 'REEMPLAZA-CON-TU-CORREO@ejemplo.com'   -- 👈 y este también, igual al de arriba
-on conflict (auth_user_id) do update set rol = 'superadmin', estado = 'activo';
+on conflict (auth_user_id) do update set rol = 'superadmin';
 
 -- Si todo salió bien, esta consulta debe mostrar una fila con rol "superadmin":
 select nombre, email, rol, estado from public.socios where rol = 'superadmin';

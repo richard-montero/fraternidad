@@ -8,13 +8,21 @@ import { supabase } from "./lib/supabaseClient.js";
 import * as api from "./lib/data.js";
 import { useAppData } from "./hooks/useAppData.js";
 import { exportarCSV } from "./lib/csv.js";
+import { exportarExcel } from "./lib/excel.js";
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 const ROLES_ACCESO = [
   { value: "socio", label: "Socio" },
+  { value: "supervisor", label: "Supervisor" },
   { value: "admin", label: "Administrador" },
   { value: "superadmin", label: "Súper administrador" },
+];
+
+const ESTADOS_SOCIO = [
+  { value: "patrimonial", label: "Patrimonial" },
+  { value: "invitado", label: "Invitado" },
+  { value: "de_baja", label: "De baja" },
 ];
 
 // ---------------------------------------------------------------------
@@ -35,7 +43,12 @@ function hoyISO() {
 function sumar(movs, campo) {
   return movs.reduce((a, m) => a + Number(m[campo]), 0);
 }
-function esNivelAdmin(rol) {
+// Puede VER las secciones administrativas (lectura): admin, superadmin y supervisor.
+function puedeVer(rol) {
+  return rol === "admin" || rol === "superadmin" || rol === "supervisor";
+}
+// Puede EDITAR / crear / registrar: solo admin y superadmin (nunca supervisor).
+function puedeEditar(rol) {
   return rol === "admin" || rol === "superadmin";
 }
 function etiquetaRol(rol) {
@@ -44,6 +57,16 @@ function etiquetaRol(rol) {
 function tonoRol(rol) {
   if (rol === "superadmin") return "dorado";
   if (rol === "admin") return "verde";
+  if (rol === "supervisor") return "azul";
+  return "gris";
+}
+function etiquetaEstado(estado) {
+  return ESTADOS_SOCIO.find((e) => e.value === estado)?.label || estado;
+}
+function tonoEstado(estado) {
+  if (estado === "patrimonial") return "verde";
+  if (estado === "invitado") return "dorado";
+  if (estado === "de_baja") return "rojo";
   return "gris";
 }
 
@@ -169,17 +192,17 @@ export default function App() {
   }
 
   const ctx = { sesion, confirmar, ...ctxData };
-  const nivelAdmin = esNivelAdmin(sesion.rol);
+  const verAdmin = puedeVer(sesion.rol);
   const NAV_ADMIN = [
     { id: "dashboard", label: "Panel general", icon: LayoutDashboard },
     { id: "socios", label: "Socios", icon: Users },
     { id: "ingresos", label: "Libro de ingresos", icon: ArrowDownCircle },
     { id: "gastos", label: "Libro de gastos", icon: ArrowUpCircle },
     { id: "reportes", label: "Reportes", icon: BarChart3 },
-    { id: "configuracion", label: "Configuración anual", icon: Settings },
+    ...(puedeEditar(sesion.rol) ? [{ id: "configuracion", label: "Configuración anual", icon: Settings }] : []),
   ];
   const NAV_SOCIO = [{ id: "dashboard", label: "Mi resumen", icon: LayoutDashboard }];
-  const items = nivelAdmin ? NAV_ADMIN : NAV_SOCIO;
+  const items = verAdmin ? NAV_ADMIN : NAV_SOCIO;
   const tituloVista = items.find((i) => i.id === vista)?.label || "Ficha de socio";
 
   return (
@@ -200,20 +223,20 @@ export default function App() {
 
         <main className="flex-1 w-full px-4 py-6 sm:px-8 sm:py-10" style={{ maxWidth: 1180 }}>
           {vista === "dashboard" && <Dashboard ctx={ctx} irASocio={(id) => { setSocioSeleccionado(id); setVista("ficha"); }} />}
-          {vista === "socios" && nivelAdmin && (
+          {vista === "socios" && verAdmin && (
             <Socios ctx={ctx} irAFicha={(id) => { setSocioSeleccionado(id); setVista("ficha"); }} />
           )}
           {vista === "ficha" && (
             <FichaSocio
               ctx={ctx}
-              socioId={nivelAdmin ? socioSeleccionado : sesion.id}
-              volver={() => setVista(nivelAdmin ? "socios" : "dashboard")}
+              socioId={verAdmin ? socioSeleccionado : sesion.id}
+              volver={() => setVista(verAdmin ? "socios" : "dashboard")}
             />
           )}
-          {vista === "ingresos" && nivelAdmin && <Ingresos ctx={ctx} />}
-          {vista === "gastos" && nivelAdmin && <Gastos ctx={ctx} />}
-          {vista === "reportes" && nivelAdmin && <Reportes ctx={ctx} />}
-          {vista === "configuracion" && nivelAdmin && <Configuracion ctx={ctx} />}
+          {vista === "ingresos" && verAdmin && <Ingresos ctx={ctx} />}
+          {vista === "gastos" && verAdmin && <Gastos ctx={ctx} />}
+          {vista === "reportes" && verAdmin && <Reportes ctx={ctx} />}
+          {vista === "configuracion" && puedeEditar(sesion.rol) && <Configuracion ctx={ctx} />}
         </main>
       </div>
     </div>
@@ -400,6 +423,7 @@ function Badge({ children, tono = "gris" }) {
     rojo: { bg: "var(--rust-bg)", color: "var(--rust)" },
     gris: { bg: "#e6e7e0", color: "var(--text-muted)" },
     dorado: { bg: "var(--gold-bg)", color: "var(--gold)" },
+    azul: { bg: "#e4ecf1", color: "#2b5a7a" },
   };
   const s = map[tono];
   return <span style={{ background: s.bg, color: s.color, padding: "2px 9px", borderRadius: 100, fontSize: "0.75rem", fontWeight: 600, whiteSpace: "nowrap" }}>{children}</span>;
@@ -457,6 +481,16 @@ function BotonCSV({ nombreArchivo, columnas, filas }) {
   return (
     <Btn variante="secondary" icon={Download} onClick={() => exportarCSV(nombreArchivo, columnas, filas)} disabled={filas.length === 0}>
       Descargar CSV
+    </Btn>
+  );
+}
+
+// Botón para descargar un archivo .xlsx real (una o varias hojas)
+function BotonExcel({ nombreArchivo, hojas }) {
+  const vacio = hojas.every((h) => h.filas.length === 0);
+  return (
+    <Btn variante="secondary" icon={Download} onClick={() => exportarExcel(nombreArchivo, hojas)} disabled={vacio}>
+      Descargar Excel
     </Btn>
   );
 }
@@ -592,26 +626,30 @@ function Barra({ label, valor, max, color, montoTexto }) {
 // DASHBOARD
 // =====================================================================
 function Dashboard({ ctx, irASocio }) {
-  if (esNivelAdmin(ctx.sesion.rol)) return <DashboardAdmin ctx={ctx} />;
+  if (puedeVer(ctx.sesion.rol)) return <DashboardAdmin ctx={ctx} />;
   return <DashboardSocio ctx={ctx} irASocio={irASocio} />;
 }
 
 function DashboardAdmin({ ctx }) {
   const { periodo, Render } = useFiltroPeriodo();
   const enPeriodo = ctx.ingresosConsolidados.filter((i) => i.fecha >= periodo.desde && i.fecha <= periodo.hasta);
+  const externosPeriodo = ctx.ingresosExternos.filter((i) => i.fecha >= periodo.desde && i.fecha <= periodo.hasta);
   const gastosPeriodo = ctx.gastos.filter((g) => g.fecha >= periodo.desde && g.fecha <= periodo.hasta);
 
   const porTipo = { patrimonial: 0, mensual: 0, voluntario: 0 };
   enPeriodo.forEach((i) => { porTipo[i.tipo] += i.monto; });
-  const totalIngPeriodo = porTipo.patrimonial + porTipo.mensual + porTipo.voluntario;
+  const totalExternoPeriodo = externosPeriodo.reduce((a, b) => a + Number(b.monto), 0);
+  const totalIngPeriodo = porTipo.patrimonial + porTipo.mensual + porTipo.voluntario + totalExternoPeriodo;
   const totalGastoPeriodo = gastosPeriodo.reduce((a, b) => a + Number(b.monto), 0);
   const saldoPeriodo = totalIngPeriodo - totalGastoPeriodo;
   const saldoAcumulado = ctx.totalIngresos - ctx.totalGastos;
 
-  const activos = ctx.socios.filter((s) => s.estado === "activo").length;
+  const enBaja = ctx.socios.filter((s) => s.estado === "de_baja").length;
+  const patrimoniales = ctx.socios.filter((s) => s.estado === "patrimonial").length;
+  const invitados = ctx.socios.filter((s) => s.estado === "invitado").length;
   const conPendientePatr = ctx.socios.filter((s) => ctx.saldoPatrimonial(s.id) > 0).length;
   const conPendienteMens = ctx.socios.filter((s) => ctx.saldoMensual(s.id) > 0).length;
-  const maxOrigen = Math.max(porTipo.patrimonial, porTipo.mensual, porTipo.voluntario, 1);
+  const maxOrigen = Math.max(porTipo.patrimonial, porTipo.mensual, porTipo.voluntario, totalExternoPeriodo, 1);
 
   return (
     <div>
@@ -630,10 +668,13 @@ function DashboardAdmin({ ctx }) {
         <Barra label="Aportes patrimoniales" valor={porTipo.patrimonial} max={maxOrigen} color="var(--green)" />
         <Barra label="Aportes mensuales" valor={porTipo.mensual} max={maxOrigen} color="var(--gold)" />
         <Barra label="Aportes voluntarios" valor={porTipo.voluntario} max={maxOrigen} color="var(--ink-soft)" />
+        <Barra label="Otros ingresos (alquiler, donaciones...)" valor={totalExternoPeriodo} max={maxOrigen} color="#2b5a7a" />
       </Card>
 
       <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
-        <StatCard label="Socios activos" value={activos} />
+        <StatCard label="Socios patrimoniales" value={patrimoniales} />
+        <StatCard label="Socios invitados" value={invitados} />
+        <StatCard label="Socios de baja" value={enBaja} />
         <StatCard label="Con saldo patrimonial pendiente" value={conPendientePatr} />
         <StatCard label="Con mensualidades pendientes" value={conPendienteMens} />
       </div>
@@ -673,6 +714,8 @@ function Socios({ ctx, irAFicha }) {
   const [nombre, setNombre] = useState("");
   const [celular, setCelular] = useState("");
   const [email, setEmail] = useState("");
+  const [fechaNac, setFechaNac] = useState("");
+  const [estadoNuevo, setEstadoNuevo] = useState("patrimonial");
   const [rolNuevo, setRolNuevo] = useState("socio");
   const [passwordNuevo, setPasswordNuevo] = useState("");
   const [error, setError] = useState(null);
@@ -681,11 +724,13 @@ function Socios({ ctx, irAFicha }) {
   const [detalleId, setDetalleId] = useState(null);
   const [tabDetalle, setTabDetalle] = useState("datos");
   const [rolEdit, setRolEdit] = useState("socio");
-  const [datosEdit, setDatosEdit] = useState({ nombre: "", celular: "", email: "" });
+  const [estadoEdit, setEstadoEdit] = useState("patrimonial");
+  const [datosEdit, setDatosEdit] = useState({ nombre: "", celular: "", email: "", fechaNacimiento: "" });
   const [mensajeDetalle, setMensajeDetalle] = useState(null);
   const [guardandoDetalle, setGuardandoDetalle] = useState(false);
 
   const esSuperadmin = ctx.sesion.rol === "superadmin";
+  const puedeEscribir = puedeEditar(ctx.sesion.rol);
 
   const filtrados = useMemo(() => ctx.socios.filter((s) => {
     const q = busqueda.trim().toLowerCase();
@@ -711,11 +756,13 @@ function Socios({ ctx, irAFicha }) {
         nombre: nombre.trim(),
         celular: celular.trim(),
         email: email.trim(),
+        fechaNacimiento: fechaNac || null,
+        estado: esSuperadmin ? estadoNuevo : "patrimonial",
         rol: esSuperadmin ? rolNuevo : "socio",
         password: esSuperadmin ? passwordNuevo : "",
       });
       aviso.exito(`Socio ${nombre.trim()} registrado correctamente.`);
-      setNombre(""); setCelular(""); setEmail(""); setRolNuevo("socio"); setPasswordNuevo(""); setMostrarForm(false);
+      setNombre(""); setCelular(""); setEmail(""); setFechaNac(""); setEstadoNuevo("patrimonial"); setRolNuevo("socio"); setPasswordNuevo(""); setMostrarForm(false);
     } catch (err) {
       setError(err.message || "No se pudo registrar el socio.");
     } finally {
@@ -728,7 +775,8 @@ function Socios({ ctx, irAFicha }) {
     setDetalleId(socio.id);
     setTabDetalle("datos");
     setRolEdit(socio.rol);
-    setDatosEdit({ nombre: socio.nombre, celular: socio.celular, email: socio.email || "" });
+    setEstadoEdit(socio.estado);
+    setDatosEdit({ nombre: socio.nombre, celular: socio.celular, email: socio.email || "", fechaNacimiento: socio.fecha_nacimiento || "" });
     setMensajeDetalle(null);
   }
 
@@ -752,6 +800,21 @@ function Socios({ ctx, irAFicha }) {
     aviso.exito(`Rol de ${socio.nombre} actualizado.`);
   }
 
+  async function guardarEstado(socio) {
+    if (estadoEdit === "de_baja") {
+      const ok = await ctx.confirmar({
+        titulo: "Dar de baja al socio",
+        mensaje: `${socio.nombre} no podrá iniciar sesión ni se le generarán nuevas mensualidades. Su historial se conserva intacto.`,
+        textoConfirmar: "Dar de baja",
+        peligro: true,
+      });
+      if (!ok) return;
+    }
+    await ctx.cambiarEstadoSocio(socio.id, estadoEdit);
+    setMensajeDetalle({ tipo: "exito", texto: `Estado de ${socio.nombre} actualizado a ${etiquetaEstado(estadoEdit)}.` });
+    aviso.exito(`Estado de ${socio.nombre} actualizado.`);
+  }
+
   async function enviarRestablecimiento(socio) {
     if (!socio.email) { setMensajeDetalle({ tipo: "error", texto: "Este socio no tiene correo registrado." }); return; }
     try {
@@ -762,31 +825,18 @@ function Socios({ ctx, irAFicha }) {
     }
   }
 
-  async function alternarEstado(socio) {
-    const activar = socio.estado !== "activo";
-    const ok = await ctx.confirmar({
-      titulo: activar ? "Reactivar socio" : "Desactivar socio",
-      mensaje: activar
-        ? `${socio.nombre} podrá volver a iniciar sesión y se le podrán generar mensualidades.`
-        : `${socio.nombre} no podrá iniciar sesión ni se le generarán nuevas mensualidades. Su historial se conserva intacto.`,
-      textoConfirmar: activar ? "Reactivar" : "Desactivar",
-      peligro: !activar,
-    });
-    if (!ok) return;
-    await ctx.toggleEstadoSocio(socio);
-    aviso.exito(`${socio.nombre} ahora está ${activar ? "activo" : "inactivo"}.`);
-  }
-
   return (
     <div>
       <PageHeader title="Socios" subtitle="Padrón de socios de la fraternidad. El correo electrónico se usa para iniciar sesión." />
 
       <div className="flex justify-between items-center gap-3 flex-wrap mb-4">
         <input className="field-input" style={{ maxWidth: 280 }} placeholder="Buscar por nombre, celular, correo o código…" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-        <Btn icon={mostrarForm ? X : Plus} onClick={() => setMostrarForm((v) => !v)}>{mostrarForm ? "Cancelar" : "Nuevo socio"}</Btn>
+        {puedeEscribir && (
+          <Btn icon={mostrarForm ? X : Plus} onClick={() => setMostrarForm((v) => !v)}>{mostrarForm ? "Cancelar" : "Nuevo socio"}</Btn>
+        )}
       </div>
 
-      {mostrarForm && (
+      {mostrarForm && puedeEscribir && (
         <Card style={{ marginBottom: 20 }}>
           <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Registrar socio</h3>
           {error && <Mensaje tipo="error">{error}</Mensaje>}
@@ -794,8 +844,14 @@ function Socios({ ctx, irAFicha }) {
             <Field label="Nombre completo"><input className="field-input" required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
             <Field label="Número de celular"><input className="field-input" required value={celular} onChange={(e) => setCelular(e.target.value)} /></Field>
             <Field label="Correo electrónico (será su usuario para ingresar)"><input className="field-input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+            <Field label="Fecha de nacimiento"><input className="field-input" type="date" value={fechaNac} onChange={(e) => setFechaNac(e.target.value)} /></Field>
             {esSuperadmin ? (
               <>
+                <Field label="Estado del socio">
+                  <select className="field-input" value={estadoNuevo} onChange={(e) => setEstadoNuevo(e.target.value)}>
+                    {ESTADOS_SOCIO.map((es) => <option key={es.value} value={es.value}>{es.label}</option>)}
+                  </select>
+                </Field>
                 <Field label="Rol de acceso al sistema">
                   <select className="field-input" value={rolNuevo} onChange={(e) => setRolNuevo(e.target.value)}>
                     {ROLES_ACCESO.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -807,7 +863,7 @@ function Socios({ ctx, irAFicha }) {
               </>
             ) : (
               <div style={{ gridColumn: "1 / -1", fontSize: "0.83rem", color: "var(--text-muted)", alignSelf: "end" }}>
-                El nuevo socio ingresará con rol <b>Socio</b> y contraseña por defecto <b>123456</b>. Solo un súper administrador puede cambiar esto.
+                El nuevo socio ingresará como <b>Patrimonial</b>, con rol <b>Socio</b> y contraseña por defecto <b>123456</b>. Solo un súper administrador puede cambiar esto.
               </div>
             )}
           </div>
@@ -836,24 +892,22 @@ function Socios({ ctx, irAFicha }) {
                       <td>{s.nombre}</td>
                       <td>{s.celular}</td>
                       <td>{s.codigo}</td>
-                      <td>
-                        <span style={{ cursor: "pointer" }} onClick={() => alternarEstado(s)}>
-                          <Badge tono={s.estado === "activo" ? "verde" : "gris"}>{s.estado === "activo" ? "Activo" : "Inactivo"}</Badge>
-                        </span>
-                      </td>
+                      <td><Badge tono={tonoEstado(s.estado)}>{etiquetaEstado(s.estado)}</Badge></td>
                       <td><Badge tono={tonoRol(s.rol)}>{etiquetaRol(s.rol)}</Badge></td>
                       <td>
                         <div className="flex items-center gap-3 justify-end">
-                          <span className="flex items-center gap-1" style={{ color: "var(--ink-soft)", cursor: "pointer", fontWeight: 600, fontSize: "0.85rem" }} onClick={() => abrirDetalle(s)}>
-                            <Pencil size={13} /> Gestionar
-                          </span>
+                          {puedeEscribir && (
+                            <span className="flex items-center gap-1" style={{ color: "var(--ink-soft)", cursor: "pointer", fontWeight: 600, fontSize: "0.85rem" }} onClick={() => abrirDetalle(s)}>
+                              <Pencil size={13} /> Gestionar
+                            </span>
+                          )}
                           <span className="flex items-center gap-1" style={{ color: "var(--ink)", cursor: "pointer", fontWeight: 600, fontSize: "0.85rem" }} onClick={() => irAFicha(s.id)}>
                             Ver ficha <ChevronRight size={14} />
                           </span>
                         </div>
                       </td>
                     </tr>
-                    {detalleId === s.id && (
+                    {detalleId === s.id && puedeEscribir && (
                       <tr>
                         <td colSpan={6} style={{ background: "var(--paper)", borderBottom: "1px solid var(--line)" }}>
                           <div style={{ padding: "16px 4px" }}>
@@ -868,7 +922,7 @@ function Socios({ ctx, irAFicha }) {
                                     borderBottom: tabDetalle === t ? "2px solid var(--gold)" : "2px solid transparent", marginBottom: -1,
                                   }}
                                 >
-                                  {t === "datos" ? "Editar datos" : "Acceso al sistema"}
+                                  {t === "datos" ? "Editar datos" : "Estado y rol de acceso"}
                                 </button>
                               ))}
                             </div>
@@ -881,6 +935,7 @@ function Socios({ ctx, irAFicha }) {
                                   <Field label="Nombre completo"><input className="field-input" value={datosEdit.nombre} onChange={(e) => setDatosEdit((d) => ({ ...d, nombre: e.target.value }))} /></Field>
                                   <Field label="Celular"><input className="field-input" value={datosEdit.celular} onChange={(e) => setDatosEdit((d) => ({ ...d, celular: e.target.value }))} /></Field>
                                   <Field label="Correo electrónico"><input className="field-input" type="email" value={datosEdit.email} onChange={(e) => setDatosEdit((d) => ({ ...d, email: e.target.value }))} /></Field>
+                                  <Field label="Fecha de nacimiento"><input className="field-input" type="date" value={datosEdit.fechaNacimiento || ""} onChange={(e) => setDatosEdit((d) => ({ ...d, fechaNacimiento: e.target.value }))} /></Field>
                                 </div>
                                 <div className="mt-3"><Btn onClick={() => guardarDatos(s)} disabled={guardandoDetalle}>{guardandoDetalle ? "Guardando…" : "Guardar datos"}</Btn></div>
                               </>
@@ -888,7 +943,15 @@ function Socios({ ctx, irAFicha }) {
 
                             {tabDetalle === "acceso" && esSuperadmin && (
                               <>
+                                <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>
+                                  Solo un súper administrador puede cambiar el estado o el rol de un socio.
+                                </p>
                                 <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+                                  <Field label="Estado del socio">
+                                    <select className="field-input" value={estadoEdit} onChange={(e) => setEstadoEdit(e.target.value)}>
+                                      {ESTADOS_SOCIO.map((es) => <option key={es.value} value={es.value}>{es.label}</option>)}
+                                    </select>
+                                  </Field>
                                   <Field label="Rol de acceso">
                                     <select className="field-input" value={rolEdit} onChange={(e) => setRolEdit(e.target.value)}>
                                       {ROLES_ACCESO.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -899,6 +962,7 @@ function Socios({ ctx, irAFicha }) {
                                   Para cambiar la contraseña de un socio, se le envía un enlace de restablecimiento a su correo — por seguridad, la aplicación no puede fijarla directamente.
                                 </p>
                                 <div className="mt-3 flex gap-2 flex-wrap">
+                                  <Btn onClick={() => guardarEstado(s)}>Guardar estado</Btn>
                                   <Btn onClick={() => guardarRol(s)}>Guardar rol</Btn>
                                   <Btn variante="secondary" onClick={() => enviarRestablecimiento(s)}>Enviar enlace de restablecimiento</Btn>
                                 </div>
@@ -928,19 +992,20 @@ function FichaSocio({ ctx, socioId, volver }) {
   const socio = ctx.socios.find((s) => s.id === socioId);
   if (!socio) return <Vacio>Socio no encontrado.</Vacio>;
 
-  const esAdmin = esNivelAdmin(ctx.sesion.rol);
+  const verAdmin = puedeVer(ctx.sesion.rol);
+  const editable = puedeEditar(ctx.sesion.rol);
 
   return (
     <div>
       <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
         <div>
-          {esAdmin && (
+          {verAdmin && (
             <span style={{ color: "var(--text-muted)", fontSize: "0.82rem", cursor: "pointer" }} onClick={volver}>&larr; Volver a socios</span>
           )}
           <h1 style={{ fontFamily: "var(--font-display)", fontSize: "1.6rem", color: "var(--ink)", margin: "4px 0 0" }}>{socio.nombre}</h1>
           <p style={{ color: "var(--text-muted)", margin: "4px 0 0" }}>
             {socio.celular} · Código {socio.codigo} ·{" "}
-            <Badge tono={socio.estado === "activo" ? "verde" : "gris"}>{socio.estado === "activo" ? "Activo" : "Inactivo"}</Badge>{" "}
+            <Badge tono={tonoEstado(socio.estado)}>{etiquetaEstado(socio.estado)}</Badge>{" "}
             <Badge tono={tonoRol(socio.rol)}>{etiquetaRol(socio.rol)}</Badge>
           </p>
         </div>
@@ -963,8 +1028,8 @@ function FichaSocio({ ctx, socioId, volver }) {
       </div>
 
       {tab === "general" && <FichaGeneral ctx={ctx} socio={socio} />}
-      {tab === "patrimonial" && <FichaPatrimonial ctx={ctx} socio={socio} esAdmin={esAdmin} />}
-      {tab === "mensual" && <FichaMensual ctx={ctx} socio={socio} esAdmin={esAdmin} />}
+      {tab === "patrimonial" && <FichaPatrimonial ctx={ctx} socio={socio} esAdmin={editable} />}
+      {tab === "mensual" && <FichaMensual ctx={ctx} socio={socio} esAdmin={editable} />}
     </div>
   );
 }
@@ -983,6 +1048,15 @@ function FichaGeneral({ ctx, socio }) {
 
   return (
     <div>
+      <Card style={{ marginBottom: 16 }}>
+        <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Datos personales</h3>
+        <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+          <div><div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Correo</div><div>{socio.email || "—"}</div></div>
+          <div><div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Celular</div><div>{socio.celular}</div></div>
+          <div><div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Fecha de nacimiento</div><div>{socio.fecha_nacimiento ? fdate(socio.fecha_nacimiento) : "—"}</div></div>
+          <div><div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Código</div><div>{socio.codigo}</div></div>
+        </div>
+      </Card>
       <Card style={{ marginBottom: 16 }}>
         <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>1 · Aporte patrimonial</h3>
         <div className="grid gap-3.5 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
@@ -1189,18 +1263,23 @@ function FichaMensual({ ctx, socio, esAdmin }) {
 // INGRESOS
 // =====================================================================
 const ETIQUETA_TIPO = { patrimonial: "Patrimonial", mensual: "Mensual", voluntario: "Voluntario" };
+const ETIQUETA_EXTERNO = { alquiler: "Alquiler / uso instalaciones", donacion: "Donación", otro: "Otro ingreso" };
 
 const TIPOS_INGRESO = [
   { value: "patrimonial", label: "Aporte patrimonial", concepto: "Pago patrimonial", ayuda: "Se registra como Haber en el mayor patrimonial del socio y reduce su saldo pendiente." },
   { value: "mensual", label: "Aporte mensual", concepto: "Pago mensualidad", ayuda: "Se registra como Haber en el mayor de aportes mensuales del socio y reduce su saldo pendiente." },
   { value: "voluntario", label: "Aporte voluntario", concepto: "Aporte voluntario", ayuda: "Ingresa como aporte voluntario. No afecta el mayor patrimonial ni el mayor mensual del socio." },
+  { value: "externo", label: "Ingreso institucional", concepto: "", ayuda: "Ingresos que no provienen de un socio: alquiler de instalaciones, donaciones u otros conceptos." },
 ];
 
 function Ingresos({ ctx }) {
   const { periodo, Render } = useFiltroPeriodo();
+  const editable = puedeEditar(ctx.sesion.rol);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [tipo, setTipo] = useState("patrimonial");
   const [socioId, setSocioId] = useState(ctx.socios[0]?.id || "");
+  const [tipoExterno, setTipoExterno] = useState("alquiler");
+  const [origen, setOrigen] = useState("");
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState(hoyISO());
   const [concepto, setConcepto] = useState("Pago patrimonial");
@@ -1209,7 +1288,15 @@ function Ingresos({ ctx }) {
   const [exito, setExito] = useState(null);
 
   const sociosPorId = useMemo(() => Object.fromEntries(ctx.socios.map((s) => [s.id, s])), [ctx.socios]);
-  const filtrados = useMemo(() => ctx.ingresosConsolidados.filter((i) => i.fecha >= periodo.desde && i.fecha <= periodo.hasta), [ctx.ingresosConsolidados, periodo]);
+
+  const todosLosIngresos = useMemo(() => {
+    const externos = ctx.ingresosExternos.map((e) => ({
+      id: e.id, fecha: e.fecha, tipo: "externo", subtipo: e.tipo, concepto: e.concepto, monto: Number(e.monto), socioId: null, origen: e.origen,
+    }));
+    return [...ctx.ingresosConsolidados, ...externos];
+  }, [ctx.ingresosConsolidados, ctx.ingresosExternos]);
+
+  const filtrados = useMemo(() => todosLosIngresos.filter((i) => i.fecha >= periodo.desde && i.fecha <= periodo.hasta), [todosLosIngresos, periodo]);
   const total = filtrados.reduce((a, b) => a + b.monto, 0);
   const tipoInfo = TIPOS_INGRESO.find((t) => t.value === tipo);
 
@@ -1218,40 +1305,51 @@ function Ingresos({ ctx }) {
 
   function cambiarTipo(v) {
     setTipo(v);
-    setConcepto(TIPOS_INGRESO.find((t) => t.value === v).concepto);
+    const info = TIPOS_INGRESO.find((t) => t.value === v);
+    setConcepto(v === "externo" ? ETIQUETA_EXTERNO[tipoExterno] : info.concepto);
     setError(null);
   }
 
-  const saldoRef = socioId ? (tipo === "patrimonial" ? ctx.saldoPatrimonial(socioId) : tipo === "mensual" ? ctx.saldoMensual(socioId) : null) : null;
+  const saldoRef = tipo !== "externo" && socioId ? (tipo === "patrimonial" ? ctx.saldoPatrimonial(socioId) : tipo === "mensual" ? ctx.saldoMensual(socioId) : null) : null;
+
+  function etiquetaFila(fila) {
+    return fila.tipo === "externo" ? ETIQUETA_EXTERNO[fila.subtipo] : ETIQUETA_TIPO[fila.tipo];
+  }
 
   async function guardar(e) {
     e.preventDefault();
     setError(null);
     setExito(null);
     const m = Number(monto);
-    if (!socioId) { setError("Selecciona el socio que realiza el aporte."); return; }
     if (!m || m <= 0) { setError("Ingresa un monto válido, mayor a cero."); return; }
 
-    if (tipo === "patrimonial") await ctx.registrarPagoPatrimonial(socioId, m, fecha, concepto);
-    else if (tipo === "mensual") await ctx.registrarPagoMensual(socioId, m, fecha, concepto);
-    else await ctx.registrarAporteVoluntario(socioId, m, fecha, concepto, observaciones);
+    if (tipo === "externo") {
+      if (!concepto.trim()) { setError("Ingresa un concepto para este ingreso."); return; }
+      await ctx.registrarIngresoExterno({ fecha, tipo: tipoExterno, concepto, origen, monto: m, observaciones });
+      setExito(`Ingreso de ${bs(m)} registrado como ${ETIQUETA_EXTERNO[tipoExterno].toLowerCase()}.`);
+    } else {
+      if (!socioId) { setError("Selecciona el socio que realiza el aporte."); return; }
+      if (tipo === "patrimonial") await ctx.registrarPagoPatrimonial(socioId, m, fecha, concepto);
+      else if (tipo === "mensual") await ctx.registrarPagoMensual(socioId, m, fecha, concepto);
+      else await ctx.registrarAporteVoluntario(socioId, m, fecha, concepto, observaciones);
+      setExito(`Ingreso de ${bs(m)} registrado como ${tipoInfo.label.toLowerCase()} para ${sociosPorId[socioId]?.nombre}.`);
+    }
 
-    setExito(`Ingreso de ${bs(m)} registrado como ${tipoInfo.label.toLowerCase()} para ${sociosPorId[socioId]?.nombre}.`);
     aviso.exito("Ingreso registrado correctamente.");
-    setMonto(""); setObservaciones("");
+    setMonto(""); setObservaciones(""); setOrigen("");
   }
 
   return (
     <div>
       <PageHeader
         title="Libro de ingresos"
-        subtitle="Consolida los aportes patrimoniales, mensuales y voluntarios de la fraternidad."
-        right={<Btn icon={mostrarForm ? X : Plus} onClick={() => setMostrarForm((v) => !v)}>{mostrarForm ? "Cancelar" : "Registrar ingreso"}</Btn>}
+        subtitle="Consolida los aportes de socios y los ingresos institucionales (alquiler, donaciones, otros) de la fraternidad."
+        right={editable ? <Btn icon={mostrarForm ? X : Plus} onClick={() => setMostrarForm((v) => !v)}>{mostrarForm ? "Cancelar" : "Registrar ingreso"}</Btn> : null}
       />
 
-      {mostrarForm && (
+      {mostrarForm && editable && (
         <Card style={{ marginBottom: 20 }}>
-          <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Registrar ingreso de socio</h3>
+          <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Registrar ingreso</h3>
 
           <div className="flex gap-1 mb-4" style={{ borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
             {TIPOS_INGRESO.map((t) => (
@@ -1275,15 +1373,26 @@ function Ingresos({ ctx }) {
           {exito && <Mensaje tipo="exito">{exito}</Mensaje>}
 
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
-            <Field label="Socio">
-              <select className="field-input" value={socioId} onChange={(e) => setSocioId(e.target.value)}>
-                {ctx.socios.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-              </select>
-            </Field>
+            {tipo === "externo" ? (
+              <Field label="Origen del ingreso">
+                <select className="field-input" value={tipoExterno} onChange={(e) => { setTipoExterno(e.target.value); setConcepto(ETIQUETA_EXTERNO[e.target.value]); }}>
+                  {Object.entries(ETIQUETA_EXTERNO).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </Field>
+            ) : (
+              <Field label="Socio">
+                <select className="field-input" value={socioId} onChange={(e) => setSocioId(e.target.value)}>
+                  {ctx.socios.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                </select>
+              </Field>
+            )}
             <Field label="Monto (Bs)"><input className="field-input" type="number" min="0" step="0.01" required value={monto} onChange={(e) => setMonto(e.target.value)} /></Field>
             <Field label="Fecha"><input className="field-input" type="date" required value={fecha} onChange={(e) => setFecha(e.target.value)} /></Field>
             <Field label="Concepto"><input className="field-input" value={concepto} onChange={(e) => setConcepto(e.target.value)} /></Field>
-            {tipo === "voluntario" && (
+            {tipo === "externo" && (
+              <Field label="De quién / qué proviene (opcional)"><input className="field-input" placeholder="Ej. Inquilino, empresa donante…" value={origen} onChange={(e) => setOrigen(e.target.value)} /></Field>
+            )}
+            {(tipo === "voluntario" || tipo === "externo") && (
               <div style={{ gridColumn: "1 / -1" }}>
                 <Field label="Observaciones"><textarea className="field-input" rows={2} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} /></Field>
               </div>
@@ -1303,17 +1412,31 @@ function Ingresos({ ctx }) {
 
       <Render />
 
-      <div className="flex justify-end mb-3 no-print">
+      <div className="flex justify-end gap-2 mb-3 no-print">
         <BotonCSV
           nombreArchivo={`ingresos_${periodo.desde}_${periodo.hasta}`}
           filas={filtrados}
           columnas={[
             { label: "Fecha", get: (i) => i.fecha },
-            { label: "Tipo", get: (i) => ETIQUETA_TIPO[i.tipo] },
-            { label: "Socio", get: (i) => sociosPorId[i.socioId]?.nombre || "" },
+            { label: "Tipo", get: (i) => etiquetaFila(i) },
+            { label: "Socio / origen", get: (i) => sociosPorId[i.socioId]?.nombre || i.origen || "" },
             { label: "Concepto", get: (i) => i.concepto },
             { label: "Monto", get: (i) => i.monto },
           ]}
+        />
+        <BotonExcel
+          nombreArchivo={`ingresos_${periodo.desde}_${periodo.hasta}`}
+          hojas={[{
+            nombre: "Ingresos",
+            filas: filtrados,
+            columnas: [
+              { label: "Fecha", get: (i) => i.fecha },
+              { label: "Tipo", get: (i) => etiquetaFila(i) },
+              { label: "Socio / origen", get: (i) => sociosPorId[i.socioId]?.nombre || i.origen || "" },
+              { label: "Concepto", get: (i) => i.concepto },
+              { label: "Monto", get: (i) => i.monto },
+            ],
+          }]}
         />
       </div>
 
@@ -1326,7 +1449,7 @@ function Ingresos({ ctx }) {
                   <tr>
                     <Th col="fecha">Fecha</Th>
                     <th>Tipo</th>
-                    <th>Socio</th>
+                    <th>Socio / origen</th>
                     <th>Concepto</th>
                     <Th col="monto" className="num">Monto</Th>
                   </tr>
@@ -1335,8 +1458,8 @@ function Ingresos({ ctx }) {
                   {visibles.map((i) => (
                     <tr key={i.id}>
                       <td>{fdate(i.fecha)}</td>
-                      <td><Badge>{ETIQUETA_TIPO[i.tipo]}</Badge></td>
-                      <td>{sociosPorId[i.socioId]?.nombre || "—"}</td>
+                      <td><Badge tono={i.tipo === "externo" ? "azul" : "gris"}>{etiquetaFila(i)}</Badge></td>
+                      <td>{sociosPorId[i.socioId]?.nombre || i.origen || "—"}</td>
                       <td>{i.concepto}</td>
                       <td className="num monto">{bs(i.monto)}</td>
                     </tr>
@@ -1357,12 +1480,22 @@ function Ingresos({ ctx }) {
 // GASTOS
 // =====================================================================
 const CATEGORIAS_GASTO = [
-  { value: "mantenimiento", label: "Mantenimiento" },
-  { value: "servicios_basicos", label: "Servicios básicos" },
-  { value: "mano_de_obra", label: "Mano de obra" },
-  { value: "sueldos", label: "Sueldos" },
-  { value: "gastos_varios", label: "Gastos varios" },
+  { value: "sueldos_salarios", label: "Sueldos y salarios" },
+  { value: "servicios_saguapac", label: "Servicios básicos — Saguapac" },
+  { value: "servicios_cre", label: "Servicios básicos — Cre" },
+  { value: "internet_telefonia", label: "Internet y telefonía" },
+  { value: "mantenimientos", label: "Mantenimientos" },
+  { value: "otros", label: "Otros" },
 ];
+// Categorías anteriores, conservadas solo para que los gastos históricos
+// sigan mostrando una etiqueta legible (no se pueden volver a elegir).
+const CATEGORIAS_GASTO_ANTERIORES = {
+  mantenimiento: "Mantenimientos", servicios_basicos: "Servicios básicos",
+  mano_de_obra: "Sueldos y salarios", sueldos: "Sueldos y salarios", gastos_varios: "Otros",
+};
+function etiquetaCategoriaGasto(valor) {
+  return CATEGORIAS_GASTO.find((c) => c.value === valor)?.label || CATEGORIAS_GASTO_ANTERIORES[valor] || valor;
+}
 
 function EnlaceComprobante({ ctx, ruta }) {
   const [cargando, setCargando] = useState(false);
@@ -1386,7 +1519,7 @@ function EnlaceComprobante({ ctx, ruta }) {
 
 function FormularioGasto({ ctx, inicial, onCancelar, onGuardado }) {
   const [fecha, setFecha] = useState(inicial?.fecha || hoyISO());
-  const [categoria, setCategoria] = useState(inicial?.categoria || "gastos_varios");
+  const [categoria, setCategoria] = useState(inicial?.categoria || "otros");
   const [concepto, setConcepto] = useState(inicial?.concepto || "");
   const [beneficiario, setBeneficiario] = useState(inicial?.beneficiario || "");
   const [monto, setMonto] = useState(inicial?.monto ?? "");
@@ -1460,6 +1593,7 @@ function Gastos({ ctx }) {
   const [editando, setEditando] = useState(null);
   const [categoriaFiltro, setCategoriaFiltro] = useState("");
 
+  const editable = puedeEditar(ctx.sesion.rol);
   const esSuperadmin = ctx.sesion.rol === "superadmin";
 
   let filtrados = ctx.gastos.filter((g) => g.fecha >= periodo.desde && g.fecha <= periodo.hasta);
@@ -1485,16 +1619,25 @@ function Gastos({ ctx }) {
     }
   }
 
+  const columnasExport = [
+    { label: "Fecha", get: (g) => g.fecha },
+    { label: "Categoría", get: (g) => etiquetaCategoriaGasto(g.categoria) },
+    { label: "Concepto", get: (g) => g.concepto },
+    { label: "Beneficiario", get: (g) => g.beneficiario || "" },
+    { label: "Forma de pago", get: (g) => g.forma_pago || "" },
+    { label: "Monto", get: (g) => g.monto },
+  ];
+
   return (
     <div>
       <PageHeader
         title="Libro de gastos"
         subtitle="Registro de egresos de la fraternidad, clasificados por categoría."
-        right={<Btn icon={mostrarForm ? X : Plus} onClick={() => { setEditando(null); setMostrarForm((v) => !v); }}>{mostrarForm ? "Cancelar" : "Registrar gasto"}</Btn>}
+        right={editable ? <Btn icon={mostrarForm ? X : Plus} onClick={() => { setEditando(null); setMostrarForm((v) => !v); }}>{mostrarForm ? "Cancelar" : "Registrar gasto"}</Btn> : null}
       />
 
-      {mostrarForm && !editando && <FormularioGasto ctx={ctx} onGuardado={() => setMostrarForm(false)} onCancelar={() => setMostrarForm(false)} />}
-      {editando && (
+      {mostrarForm && editable && !editando && <FormularioGasto ctx={ctx} onGuardado={() => setMostrarForm(false)} onCancelar={() => setMostrarForm(false)} />}
+      {editando && editable && (
         <FormularioGasto
           ctx={ctx}
           inicial={editando}
@@ -1506,7 +1649,7 @@ function Gastos({ ctx }) {
       <Render />
 
       <div className="flex justify-between items-end flex-wrap gap-3 mb-4 no-print">
-        <div style={{ maxWidth: 220 }}>
+        <div style={{ maxWidth: 260 }}>
           <Field label="Filtrar por categoría">
             <select className="field-input" value={categoriaFiltro} onChange={(e) => setCategoriaFiltro(e.target.value)}>
               <option value="">Todas las categorías</option>
@@ -1514,18 +1657,10 @@ function Gastos({ ctx }) {
             </select>
           </Field>
         </div>
-        <BotonCSV
-          nombreArchivo={`gastos_${periodo.desde}_${periodo.hasta}`}
-          filas={filtrados}
-          columnas={[
-            { label: "Fecha", get: (g) => g.fecha },
-            { label: "Categoría", get: (g) => CATEGORIAS_GASTO.find((c) => c.value === g.categoria)?.label || g.categoria },
-            { label: "Concepto", get: (g) => g.concepto },
-            { label: "Beneficiario", get: (g) => g.beneficiario || "" },
-            { label: "Forma de pago", get: (g) => g.forma_pago || "" },
-            { label: "Monto", get: (g) => g.monto },
-          ]}
-        />
+        <div className="flex gap-2">
+          <BotonCSV nombreArchivo={`gastos_${periodo.desde}_${periodo.hasta}`} filas={filtrados} columnas={columnasExport} />
+          <BotonExcel nombreArchivo={`gastos_${periodo.desde}_${periodo.hasta}`} hojas={[{ nombre: "Gastos", filas: filtrados, columnas: columnasExport }]} />
+        </div>
       </div>
 
       <Card>
@@ -1548,7 +1683,7 @@ function Gastos({ ctx }) {
                   {visibles.map((g) => (
                     <tr key={g.id}>
                       <td>{fdate(g.fecha)}</td>
-                      <td><Badge>{CATEGORIAS_GASTO.find((c) => c.value === g.categoria)?.label}</Badge></td>
+                      <td><Badge>{etiquetaCategoriaGasto(g.categoria)}</Badge></td>
                       <td>{g.concepto}</td>
                       <td>{g.beneficiario || "—"}</td>
                       <td>{g.comprobante_ruta ? <EnlaceComprobante ctx={ctx} ruta={g.comprobante_ruta} /> : "—"}</td>
@@ -1578,35 +1713,80 @@ function Gastos({ ctx }) {
 // =====================================================================
 // REPORTES
 // =====================================================================
+const REPORTES_TABS = [
+  ["resumen", "Resumen general"],
+  ["ingresos_socios", "Ingresos de socios"],
+  ["detalle_socio", "Detalle por socio"],
+  ["mov_ingresos", "Movimientos de ingresos"],
+  ["mov_egresos", "Movimientos de egresos"],
+  ["resumen_periodo", "Resumen mensual y anual"],
+  ["estado_resultado", "Estado de resultado"],
+];
+
 function Reportes({ ctx }) {
-  const { periodo, Render } = useFiltroPeriodo();
-  const ingresosPeriodo = ctx.ingresosConsolidados.filter((i) => i.fecha >= periodo.desde && i.fecha <= periodo.hasta);
-  const gastosPeriodo = ctx.gastos.filter((g) => g.fecha >= periodo.desde && g.fecha <= periodo.hasta);
-
-  const porTipo = { patrimonial: 0, mensual: 0, voluntario: 0 };
-  ingresosPeriodo.forEach((i) => { porTipo[i.tipo] += i.monto; });
-  const porCategoria = Object.fromEntries(CATEGORIAS_GASTO.map((c) => [c.value, 0]));
-  gastosPeriodo.forEach((g) => { porCategoria[g.categoria] += Number(g.monto); });
-
-  const totalIng = porTipo.patrimonial + porTipo.mensual + porTipo.voluntario;
-  const totalGas = Object.values(porCategoria).reduce((a, b) => a + b, 0);
-  const maxIngGas = Math.max(totalIng, totalGas, 1);
-  const maxCategoria = Math.max(...Object.values(porCategoria), 1);
-
-  const pendientes = ctx.socios
-    .filter((s) => s.estado === "activo")
-    .map((s) => ({ nombre: s.nombre, sp: ctx.saldoPatrimonial(s.id), sm: ctx.saldoMensual(s.id) }))
-    .filter((s) => s.sp > 0 || s.sm > 0);
+  const [tab, setTab] = useState("resumen");
 
   return (
     <div>
       <PageHeader
         title="Reportes"
-        subtitle="Resultados financieros por período, útiles para la administración de la fraternidad."
+        subtitle="Resultados financieros de la fraternidad. Todos los reportes se pueden imprimir o guardar como PDF, y exportar a Excel/CSV."
         right={<Btn variante="secondary" icon={Printer} onClick={() => window.print()}>Imprimir / PDF</Btn>}
       />
-      <Render />
 
+      <div className="flex gap-1 mb-5 no-print" style={{ borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
+        {REPORTES_TABS.map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            style={{
+              background: "none", border: "none", padding: "9px 14px", fontWeight: 600, fontSize: "0.85rem", whiteSpace: "nowrap",
+              color: tab === id ? "var(--ink)" : "var(--text-muted)", cursor: "pointer",
+              borderBottom: tab === id ? "2px solid var(--gold)" : "2px solid transparent", marginBottom: -1,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "resumen" && <ReporteResumen ctx={ctx} />}
+      {tab === "ingresos_socios" && <ReporteIngresosSocios ctx={ctx} />}
+      {tab === "detalle_socio" && <ReporteDetallePorSocio ctx={ctx} />}
+      {tab === "mov_ingresos" && <ReporteMovimientos ctx={ctx} tipo="ingresos" />}
+      {tab === "mov_egresos" && <ReporteMovimientos ctx={ctx} tipo="egresos" />}
+      {tab === "resumen_periodo" && <ReporteResumenPeriodo ctx={ctx} />}
+      {tab === "estado_resultado" && <ReporteEstadoResultado ctx={ctx} />}
+    </div>
+  );
+}
+
+// ---------- 1) Resumen general (vista original, con ingresos institucionales) ----------
+function ReporteResumen({ ctx }) {
+  const { periodo, Render } = useFiltroPeriodo();
+  const ingresosPeriodo = ctx.ingresosConsolidados.filter((i) => i.fecha >= periodo.desde && i.fecha <= periodo.hasta);
+  const externosPeriodo = ctx.ingresosExternos.filter((i) => i.fecha >= periodo.desde && i.fecha <= periodo.hasta);
+  const gastosPeriodo = ctx.gastos.filter((g) => g.fecha >= periodo.desde && g.fecha <= periodo.hasta);
+
+  const porTipo = { patrimonial: 0, mensual: 0, voluntario: 0 };
+  ingresosPeriodo.forEach((i) => { porTipo[i.tipo] += i.monto; });
+  const totalExterno = externosPeriodo.reduce((a, b) => a + Number(b.monto), 0);
+  const porCategoria = Object.fromEntries(CATEGORIAS_GASTO.map((c) => [c.value, 0]));
+  gastosPeriodo.forEach((g) => { porCategoria[g.categoria] = (porCategoria[g.categoria] || 0) + Number(g.monto); });
+
+  const totalIng = porTipo.patrimonial + porTipo.mensual + porTipo.voluntario + totalExterno;
+  const totalGas = gastosPeriodo.reduce((a, b) => a + Number(b.monto), 0);
+  const maxIngGas = Math.max(totalIng, totalGas, 1);
+  const maxCategoria = Math.max(...Object.values(porCategoria), 1);
+
+  const pendientes = ctx.socios
+    .filter((s) => s.estado !== "de_baja")
+    .map((s) => ({ nombre: s.nombre, sp: ctx.saldoPatrimonial(s.id), sm: ctx.saldoMensual(s.id) }))
+    .filter((s) => s.sp > 0 || s.sm > 0);
+
+  return (
+    <div>
+      <Render />
       <div className="grid gap-3.5 mb-6" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
         <StatCard label={`Ingresos — ${periodo.etiqueta}`} value={bs(totalIng)} tono="positivo" />
         <StatCard label={`Egresos — ${periodo.etiqueta}`} value={bs(totalGas)} tono="negativo" />
@@ -1620,25 +1800,13 @@ function Reportes({ ctx }) {
       </Card>
 
       <Card style={{ marginBottom: 16 }}>
-        <div className="flex justify-between items-start flex-wrap gap-2">
-          <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Ingresos por tipo</h3>
-          <div className="no-print">
-            <BotonCSV
-              nombreArchivo={`reporte_ingresos_${periodo.desde}_${periodo.hasta}`}
-              filas={[
-                { concepto: "Patrimoniales", monto: porTipo.patrimonial },
-                { concepto: "Mensuales", monto: porTipo.mensual },
-                { concepto: "Voluntarios", monto: porTipo.voluntario },
-              ]}
-              columnas={[{ label: "Concepto", get: (r) => r.concepto }, { label: "Monto", get: (r) => r.monto }]}
-            />
-          </div>
-        </div>
+        <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Ingresos por tipo</h3>
         <table className="ledger">
           <tbody>
-            <tr><td>Patrimoniales</td><td className="num monto">{bs(porTipo.patrimonial)}</td></tr>
-            <tr><td>Mensuales</td><td className="num monto">{bs(porTipo.mensual)}</td></tr>
-            <tr><td>Voluntarios</td><td className="num monto">{bs(porTipo.voluntario)}</td></tr>
+            <tr><td>Aportes patrimoniales</td><td className="num monto">{bs(porTipo.patrimonial)}</td></tr>
+            <tr><td>Aportes mensuales</td><td className="num monto">{bs(porTipo.mensual)}</td></tr>
+            <tr><td>Aportes voluntarios</td><td className="num monto">{bs(porTipo.voluntario)}</td></tr>
+            <tr><td>Ingresos institucionales (alquiler, donaciones, otros)</td><td className="num monto">{bs(totalExterno)}</td></tr>
           </tbody>
           <tfoot><tr><td>Total</td><td className="num monto">{bs(totalIng)}</td></tr></tfoot>
         </table>
@@ -1647,7 +1815,7 @@ function Reportes({ ctx }) {
       <Card style={{ marginBottom: 16 }}>
         <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Egresos por categoría</h3>
         {CATEGORIAS_GASTO.map((c) => (
-          <Barra key={c.value} label={c.label} valor={porCategoria[c.value]} max={maxCategoria} color="var(--rust)" />
+          <Barra key={c.value} label={c.label} valor={porCategoria[c.value] || 0} max={maxCategoria} color="var(--rust)" />
         ))}
         <table className="ledger" style={{ marginTop: 8 }}>
           <tfoot><tr><td>Total</td><td className="num monto">{bs(totalGas)}</td></tr></tfoot>
@@ -1672,6 +1840,309 @@ function Reportes({ ctx }) {
             </table>
           </div>
         )}
+      </Card>
+    </div>
+  );
+}
+
+// ---------- 2) Ingresos que provienen SOLO de socios (mensual/anual/rango) ----------
+function ReporteIngresosSocios({ ctx }) {
+  const { periodo, Render } = useFiltroPeriodo();
+  const enPeriodo = ctx.ingresosConsolidados.filter((i) => i.fecha >= periodo.desde && i.fecha <= periodo.hasta);
+  const porTipo = { patrimonial: 0, mensual: 0, voluntario: 0 };
+  enPeriodo.forEach((i) => { porTipo[i.tipo] += i.monto; });
+  const total = porTipo.patrimonial + porTipo.mensual + porTipo.voluntario;
+  const filas = [
+    { concepto: "Aportes patrimoniales", monto: porTipo.patrimonial },
+    { concepto: "Aportes mensuales", monto: porTipo.mensual },
+    { concepto: "Aportes voluntarios", monto: porTipo.voluntario },
+  ];
+
+  return (
+    <div>
+      <Render />
+      <div className="flex justify-between items-start flex-wrap gap-3 mb-4">
+        <StatCard label={`Total ingresos de socios — ${periodo.etiqueta}`} value={bs(total)} tono="positivo" />
+        <div className="flex gap-2 no-print">
+          <BotonCSV nombreArchivo={`ingresos_socios_${periodo.desde}_${periodo.hasta}`} filas={filas} columnas={[{ label: "Concepto", get: (r) => r.concepto }, { label: "Monto", get: (r) => r.monto }]} />
+          <BotonExcel nombreArchivo={`ingresos_socios_${periodo.desde}_${periodo.hasta}`} hojas={[{ nombre: "Ingresos de socios", filas, columnas: [{ label: "Concepto", get: (r) => r.concepto }, { label: "Monto", get: (r) => r.monto }] }]} />
+        </div>
+      </div>
+      <Card>
+        <table className="ledger">
+          <thead><tr><th>Concepto</th><th className="num">Monto</th></tr></thead>
+          <tbody>{filas.map((f) => <tr key={f.concepto}><td>{f.concepto}</td><td className="num monto">{bs(f.monto)}</td></tr>)}</tbody>
+          <tfoot><tr><td>Total</td><td className="num monto">{bs(total)}</td></tr></tfoot>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+// ---------- 3) Detalle de pagos por socio, con subtotales ----------
+function ReporteDetallePorSocio({ ctx }) {
+  const { periodo, Render } = useFiltroPeriodo();
+
+  const filas = useMemo(() => {
+    return ctx.socios.map((s) => {
+      const patrimonial = (ctx.movPatrimoniales[s.id] || []).filter((m) => m.haber > 0 && m.fecha >= periodo.desde && m.fecha <= periodo.hasta).reduce((a, m) => a + Number(m.haber), 0);
+      const mensual = (ctx.movMensuales[s.id] || []).filter((m) => m.haber > 0 && m.fecha >= periodo.desde && m.fecha <= periodo.hasta).reduce((a, m) => a + Number(m.haber), 0);
+      const voluntario = ctx.aportesVoluntarios.filter((a) => a.socio_id === s.id && a.fecha >= periodo.desde && a.fecha <= periodo.hasta).reduce((a, m) => a + Number(m.monto), 0);
+      return { socio: s.nombre, patrimonial, mensual, voluntario, total: patrimonial + mensual + voluntario };
+    }).filter((f) => f.total > 0);
+  }, [ctx.socios, ctx.movPatrimoniales, ctx.movMensuales, ctx.aportesVoluntarios, periodo]);
+
+  const totales = filas.reduce((a, f) => ({ patrimonial: a.patrimonial + f.patrimonial, mensual: a.mensual + f.mensual, voluntario: a.voluntario + f.voluntario, total: a.total + f.total }), { patrimonial: 0, mensual: 0, voluntario: 0, total: 0 });
+
+  const columnasExport = [
+    { label: "Socio", get: (f) => f.socio },
+    { label: "Patrimonial", get: (f) => f.patrimonial },
+    { label: "Mensual", get: (f) => f.mensual },
+    { label: "Voluntario", get: (f) => f.voluntario },
+    { label: "Total", get: (f) => f.total },
+  ];
+
+  return (
+    <div>
+      <Render />
+      <div className="flex justify-end gap-2 mb-3 no-print">
+        <BotonCSV nombreArchivo={`detalle_pagos_socio_${periodo.desde}_${periodo.hasta}`} filas={filas} columnas={columnasExport} />
+        <BotonExcel nombreArchivo={`detalle_pagos_socio_${periodo.desde}_${periodo.hasta}`} hojas={[{ nombre: "Detalle por socio", filas, columnas: columnasExport }]} />
+      </div>
+      <Card>
+        {filas.length === 0 ? <Vacio>Ningún socio realizó pagos en este período.</Vacio> : (
+          <div className="ledger-wrap">
+            <table className="ledger">
+              <thead><tr><th>Socio</th><th className="num">Patrimonial</th><th className="num">Mensual</th><th className="num">Voluntario</th><th className="num">Total</th></tr></thead>
+              <tbody>
+                {filas.map((f) => (
+                  <tr key={f.socio}>
+                    <td>{f.socio}</td>
+                    <td className="num monto">{f.patrimonial > 0 ? bs(f.patrimonial) : "—"}</td>
+                    <td className="num monto">{f.mensual > 0 ? bs(f.mensual) : "—"}</td>
+                    <td className="num monto">{f.voluntario > 0 ? bs(f.voluntario) : "—"}</td>
+                    <td className="num monto" style={{ fontWeight: 700 }}>{bs(f.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>Total</td>
+                  <td className="num monto">{bs(totales.patrimonial)}</td>
+                  <td className="num monto">{bs(totales.mensual)}</td>
+                  <td className="num monto">{bs(totales.voluntario)}</td>
+                  <td className="num monto">{bs(totales.total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ---------- 4 y 5) Movimientos de ingresos / egresos: resumen y detalle ----------
+function ReporteMovimientos({ ctx, tipo }) {
+  const { periodo, Render } = useFiltroPeriodo();
+  const [vista, setVista] = useState("resumen");
+  const esIngresos = tipo === "ingresos";
+
+  const sociosPorId = useMemo(() => Object.fromEntries(ctx.socios.map((s) => [s.id, s])), [ctx.socios]);
+
+  const detalle = useMemo(() => {
+    if (esIngresos) {
+      const externos = ctx.ingresosExternos.map((e) => ({ id: e.id, fecha: e.fecha, categoria: ETIQUETA_EXTERNO[e.tipo], concepto: e.concepto, origen: sociosPorId[e.socio_id]?.nombre || e.origen || "—", monto: Number(e.monto) }));
+      const socios = ctx.ingresosConsolidados.map((i) => ({ id: i.id, fecha: i.fecha, categoria: ETIQUETA_TIPO[i.tipo], concepto: i.concepto, origen: sociosPorId[i.socioId]?.nombre || "—", monto: i.monto }));
+      return [...socios, ...externos].filter((f) => f.fecha >= periodo.desde && f.fecha <= periodo.hasta);
+    }
+    return ctx.gastos.filter((g) => g.fecha >= periodo.desde && g.fecha <= periodo.hasta)
+      .map((g) => ({ id: g.id, fecha: g.fecha, categoria: etiquetaCategoriaGasto(g.categoria), concepto: g.concepto, origen: g.beneficiario || "—", monto: Number(g.monto) }));
+  }, [ctx, periodo, esIngresos, sociosPorId]);
+
+  const resumen = useMemo(() => {
+    const mapa = {};
+    detalle.forEach((f) => { mapa[f.categoria] = (mapa[f.categoria] || 0) + f.monto; });
+    return Object.entries(mapa).map(([categoria, monto]) => ({ categoria, monto })).sort((a, b) => b.monto - a.monto);
+  }, [detalle]);
+
+  const total = detalle.reduce((a, f) => a + f.monto, 0);
+  const { ordenados, Th } = useOrden(detalle, "fecha", "desc");
+  const { visibles, BotonMostrarMas } = useMostrarMas(ordenados, 30);
+
+  const nombreArchivo = `movimientos_${tipo}_${vista}_${periodo.desde}_${periodo.hasta}`;
+  const columnasResumen = [{ label: "Categoría", get: (r) => r.categoria }, { label: "Monto", get: (r) => r.monto }];
+  const columnasDetalle = [
+    { label: "Fecha", get: (r) => r.fecha }, { label: "Categoría", get: (r) => r.categoria },
+    { label: esIngresos ? "Socio / origen" : "Beneficiario", get: (r) => r.origen }, { label: "Concepto", get: (r) => r.concepto }, { label: "Monto", get: (r) => r.monto },
+  ];
+
+  return (
+    <div>
+      <Render />
+      <div className="flex justify-between items-center flex-wrap gap-3 mb-4">
+        <div className="flex gap-2 no-print">
+          <Btn variante={vista === "resumen" ? "primary" : "secondary"} onClick={() => setVista("resumen")}>Resumen</Btn>
+          <Btn variante={vista === "detalle" ? "primary" : "secondary"} onClick={() => setVista("detalle")}>Detalle</Btn>
+        </div>
+        <div className="flex gap-2 no-print">
+          <BotonCSV nombreArchivo={nombreArchivo} filas={vista === "resumen" ? resumen : detalle} columnas={vista === "resumen" ? columnasResumen : columnasDetalle} />
+          <BotonExcel nombreArchivo={nombreArchivo} hojas={[{ nombre: vista === "resumen" ? "Resumen" : "Detalle", filas: vista === "resumen" ? resumen : detalle, columnas: vista === "resumen" ? columnasResumen : columnasDetalle }]} />
+        </div>
+      </div>
+
+      <Card>
+        {vista === "resumen" ? (
+          resumen.length === 0 ? <Vacio>No hay movimientos en este período.</Vacio> : (
+            <table className="ledger">
+              <thead><tr><th>Categoría</th><th className="num">Monto</th></tr></thead>
+              <tbody>{resumen.map((r) => <tr key={r.categoria}><td>{r.categoria}</td><td className="num monto">{bs(r.monto)}</td></tr>)}</tbody>
+              <tfoot><tr><td>Total</td><td className="num monto">{bs(total)}</td></tr></tfoot>
+            </table>
+          )
+        ) : visibles.length === 0 ? <Vacio>No hay movimientos en este período.</Vacio> : (
+          <>
+            <div className="ledger-wrap">
+              <table className="ledger">
+                <thead>
+                  <tr>
+                    <Th col="fecha">Fecha</Th><th>Categoría</th><th>{esIngresos ? "Socio / origen" : "Beneficiario"}</th><th>Concepto</th><Th col="monto" className="num">Monto</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibles.map((f) => (
+                    <tr key={f.id}><td>{fdate(f.fecha)}</td><td><Badge>{f.categoria}</Badge></td><td>{f.origen}</td><td>{f.concepto}</td><td className="num monto">{bs(f.monto)}</td></tr>
+                  ))}
+                </tbody>
+                <tfoot><tr><td colSpan={4}>Total del período</td><td className="num monto">{bs(total)}</td></tr></tfoot>
+              </table>
+            </div>
+            <BotonMostrarMas />
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ---------- 6) Resumen mensual y anual de ingresos y egresos ----------
+function ReporteResumenPeriodo({ ctx }) {
+  const [anio, setAnio] = useState(new Date().getFullYear());
+
+  const filas = useMemo(() => {
+    return MESES.map((nombreMes, idx) => {
+      const mes = idx + 1;
+      const desde = `${anio}-${String(mes).padStart(2, "0")}-01`;
+      const hasta = `${anio}-${String(mes).padStart(2, "0")}-${String(new Date(anio, mes, 0).getDate()).padStart(2, "0")}`;
+      const ingSocios = ctx.ingresosConsolidados.filter((i) => i.fecha >= desde && i.fecha <= hasta).reduce((a, b) => a + b.monto, 0);
+      const ingExt = ctx.ingresosExternos.filter((i) => i.fecha >= desde && i.fecha <= hasta).reduce((a, b) => a + Number(b.monto), 0);
+      const egresos = ctx.gastos.filter((g) => g.fecha >= desde && g.fecha <= hasta).reduce((a, b) => a + Number(b.monto), 0);
+      const ingresos = ingSocios + ingExt;
+      return { mes: nombreMes, ingresos, egresos, saldo: ingresos - egresos };
+    });
+  }, [ctx, anio]);
+
+  const totales = filas.reduce((a, f) => ({ ingresos: a.ingresos + f.ingresos, egresos: a.egresos + f.egresos, saldo: a.saldo + f.saldo }), { ingresos: 0, egresos: 0, saldo: 0 });
+  const columnasExport = [{ label: "Mes", get: (f) => f.mes }, { label: "Ingresos", get: (f) => f.ingresos }, { label: "Egresos", get: (f) => f.egresos }, { label: "Saldo", get: (f) => f.saldo }];
+
+  return (
+    <div>
+      <div className="flex justify-between items-end flex-wrap gap-3 mb-4">
+        <Field label="Año"><input className="field-input" type="number" style={{ width: 120 }} value={anio} onChange={(e) => setAnio(Number(e.target.value))} /></Field>
+        <div className="flex gap-2 no-print">
+          <BotonCSV nombreArchivo={`resumen_mensual_${anio}`} filas={filas} columnas={columnasExport} />
+          <BotonExcel nombreArchivo={`resumen_mensual_${anio}`} hojas={[{ nombre: `Resumen ${anio}`, filas, columnas: columnasExport }]} />
+        </div>
+      </div>
+      <div className="grid gap-3.5 mb-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+        <StatCard label={`Ingresos ${anio}`} value={bs(totales.ingresos)} tono="positivo" />
+        <StatCard label={`Egresos ${anio}`} value={bs(totales.egresos)} tono="negativo" />
+        <StatCard label={`Saldo ${anio}`} value={bs(totales.saldo)} tono={totales.saldo >= 0 ? "positivo" : "negativo"} />
+      </div>
+      <Card>
+        <table className="ledger">
+          <thead><tr><th>Mes</th><th className="num">Ingresos</th><th className="num">Egresos</th><th className="num">Saldo</th></tr></thead>
+          <tbody>
+            {filas.map((f) => (
+              <tr key={f.mes}><td>{f.mes}</td><td className="num monto">{bs(f.ingresos)}</td><td className="num monto">{bs(f.egresos)}</td><td className="num monto" style={{ color: f.saldo >= 0 ? "var(--green)" : "var(--rust)" }}>{bs(f.saldo)}</td></tr>
+            ))}
+          </tbody>
+          <tfoot><tr><td>Total {anio}</td><td className="num monto">{bs(totales.ingresos)}</td><td className="num monto">{bs(totales.egresos)}</td><td className="num monto">{bs(totales.saldo)}</td></tr></tfoot>
+        </table>
+      </Card>
+    </div>
+  );
+}
+
+// ---------- 7) Estado de resultado por gestión (año) ----------
+function ReporteEstadoResultado({ ctx }) {
+  const [anio, setAnio] = useState(new Date().getFullYear());
+  const desde = `${anio}-01-01`;
+  const hasta = `${anio}-12-31`;
+
+  const porTipo = { patrimonial: 0, mensual: 0, voluntario: 0 };
+  ctx.ingresosConsolidados.filter((i) => i.fecha >= desde && i.fecha <= hasta).forEach((i) => { porTipo[i.tipo] += i.monto; });
+  const totalExterno = ctx.ingresosExternos.filter((i) => i.fecha >= desde && i.fecha <= hasta).reduce((a, b) => a + Number(b.monto), 0);
+  const totalIngresos = porTipo.patrimonial + porTipo.mensual + porTipo.voluntario + totalExterno;
+
+  const porCategoria = {};
+  ctx.gastos.filter((g) => g.fecha >= desde && g.fecha <= hasta).forEach((g) => {
+    const l = etiquetaCategoriaGasto(g.categoria);
+    porCategoria[l] = (porCategoria[l] || 0) + Number(g.monto);
+  });
+  const totalEgresos = Object.values(porCategoria).reduce((a, b) => a + b, 0);
+  const resultado = totalIngresos - totalEgresos;
+
+  const filasExport = [
+    { concepto: "Aportes patrimoniales", monto: porTipo.patrimonial },
+    { concepto: "Aportes mensuales", monto: porTipo.mensual },
+    { concepto: "Aportes voluntarios", monto: porTipo.voluntario },
+    { concepto: "Ingresos institucionales", monto: totalExterno },
+    { concepto: "Total ingresos", monto: totalIngresos },
+    ...Object.entries(porCategoria).map(([concepto, monto]) => ({ concepto: `Egreso — ${concepto}`, monto: -monto })),
+    { concepto: "Total egresos", monto: -totalEgresos },
+    { concepto: "Resultado del ejercicio", monto: resultado },
+  ];
+  const columnasExport = [{ label: "Concepto", get: (f) => f.concepto }, { label: "Monto", get: (f) => f.monto }];
+
+  return (
+    <div>
+      <div className="flex justify-between items-end flex-wrap gap-3 mb-5">
+        <Field label="Gestión (año)"><input className="field-input" type="number" style={{ width: 120 }} value={anio} onChange={(e) => setAnio(Number(e.target.value))} /></Field>
+        <div className="flex gap-2 no-print">
+          <BotonCSV nombreArchivo={`estado_resultado_${anio}`} filas={filasExport} columnas={columnasExport} />
+          <BotonExcel nombreArchivo={`estado_resultado_${anio}`} hojas={[{ nombre: `Estado de resultado ${anio}`, filas: filasExport, columnas: columnasExport }]} />
+        </div>
+      </div>
+
+      <Card>
+        <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Estado de resultado — Gestión {anio}</h3>
+        <table className="ledger">
+          <thead><tr><th>Ingresos</th><th className="num">Monto</th></tr></thead>
+          <tbody>
+            <tr><td>Aportes patrimoniales</td><td className="num monto">{bs(porTipo.patrimonial)}</td></tr>
+            <tr><td>Aportes mensuales</td><td className="num monto">{bs(porTipo.mensual)}</td></tr>
+            <tr><td>Aportes voluntarios</td><td className="num monto">{bs(porTipo.voluntario)}</td></tr>
+            <tr><td>Ingresos institucionales</td><td className="num monto">{bs(totalExterno)}</td></tr>
+          </tbody>
+          <tfoot><tr><td>Total ingresos</td><td className="num monto">{bs(totalIngresos)}</td></tr></tfoot>
+        </table>
+
+        <table className="ledger" style={{ marginTop: 20 }}>
+          <thead><tr><th>Egresos</th><th className="num">Monto</th></tr></thead>
+          <tbody>
+            {Object.entries(porCategoria).map(([cat, monto]) => <tr key={cat}><td>{cat}</td><td className="num monto">{bs(monto)}</td></tr>)}
+            {Object.keys(porCategoria).length === 0 && <tr><td colSpan={2} style={{ color: "var(--text-muted)" }}>Sin egresos registrados.</td></tr>}
+          </tbody>
+          <tfoot><tr><td>Total egresos</td><td className="num monto">{bs(totalEgresos)}</td></tr></tfoot>
+        </table>
+
+        <div className="mt-5" style={{ borderTop: "2px solid var(--line-strong)", paddingTop: 14 }}>
+          <div className="flex justify-between" style={{ fontFamily: "var(--font-display)", fontSize: "1.15rem" }}>
+            <span style={{ color: "var(--ink)" }}>Resultado del ejercicio</span>
+            <span className="monto" style={{ color: resultado >= 0 ? "var(--green)" : "var(--rust)", fontWeight: 700 }}>{bs(resultado)}</span>
+          </div>
+        </div>
       </Card>
     </div>
   );

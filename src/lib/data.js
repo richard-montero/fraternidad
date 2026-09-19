@@ -23,9 +23,9 @@ export async function iniciarSesion(email, password) {
       "Tu usuario existe en Autenticación pero no está vinculado a ningún socio. Pide a un administrador que te registre desde la sección Socios."
     );
   }
-  if (socio.estado !== "activo") {
+  if (socio.estado === "de_baja") {
     await supabase.auth.signOut();
-    throw new Error("Tu cuenta está inactiva. Contacta a un administrador de la fraternidad.");
+    throw new Error("Tu cuenta está dada de baja. Contacta a un administrador de la fraternidad.");
   }
   return socio;
 }
@@ -38,7 +38,7 @@ export async function obtenerSesionActual() {
   const { data } = await supabase.auth.getUser();
   if (!data?.user) return null;
   const socio = await obtenerSocioPorAuthId(data.user.id);
-  if (!socio || socio.estado !== "activo") return null;
+  if (!socio || socio.estado === "de_baja") return null;
   return socio;
 }
 
@@ -59,7 +59,7 @@ export async function listarSocios() {
   return data;
 }
 
-export async function crearSocio({ nombre, celular, email, rol = "socio", password }) {
+export async function crearSocio({ nombre, celular, email, fechaNacimiento, rol = "socio", estado = "patrimonial", password }) {
   const passwordFinal = password && password.trim().length >= 6 ? password.trim() : "123456";
   const authUserId = await crearUsuarioDeAcceso(email.trim(), passwordFinal);
 
@@ -70,8 +70,9 @@ export async function crearSocio({ nombre, celular, email, rol = "socio", passwo
       nombre: nombre.trim(),
       celular: celular.trim(),
       email: email.trim(),
+      fecha_nacimiento: fechaNacimiento || null,
       codigo: generarCodigoSocio(),
-      estado: "activo",
+      estado,
       rol,
     })
     .select()
@@ -80,9 +81,11 @@ export async function crearSocio({ nombre, celular, email, rol = "socio", passwo
   return data;
 }
 
-export async function toggleEstadoSocio(socio) {
-  const nuevoEstado = socio.estado === "activo" ? "inactivo" : "activo";
-  const { error } = await supabase.from("socios").update({ estado: nuevoEstado }).eq("id", socio.id);
+// Cambiar el estado (Patrimonial / Invitado / De baja) — la base de
+// datos exige que solo un súper administrador pueda hacerlo (trigger en
+// supabase/04_cambios.sql), independientemente de qué muestre la interfaz.
+export async function cambiarEstadoSocio(socioId, nuevoEstado) {
+  const { error } = await supabase.from("socios").update({ estado: nuevoEstado }).eq("id", socioId);
   if (error) throw error;
 }
 
@@ -91,10 +94,10 @@ export async function cambiarRolSocio(socioId, nuevoRol) {
   if (error) throw error;
 }
 
-export async function editarSocio(socioId, { nombre, celular, email }) {
+export async function editarSocio(socioId, { nombre, celular, email, fechaNacimiento }) {
   const { error } = await supabase
     .from("socios")
-    .update({ nombre: nombre.trim(), celular: celular.trim(), email: email.trim() })
+    .update({ nombre: nombre.trim(), celular: celular.trim(), email: email.trim(), fecha_nacimiento: fechaNacimiento || null })
     .eq("id", socioId);
   if (error) throw error;
 }
@@ -202,9 +205,9 @@ export async function generarMensualidades(anio, mes, socios, configAnual) {
   if (errGen) throw errGen;
   const idsConObligacion = new Set(yaGeneradas.map((o) => o.socio_id));
 
-  const activos = socios.filter((s) => s.estado === "activo" && !idsConObligacion.has(s.id));
+  const activos = socios.filter((s) => s.estado !== "de_baja" && !idsConObligacion.has(s.id));
   if (activos.length === 0) {
-    return { ok: true, mensaje: "No se generaron obligaciones nuevas: ya existían para todos los socios activos." };
+    return { ok: true, mensaje: "No se generaron obligaciones nuevas: ya existían para todos los socios (los socios de baja no reciben mensualidades)." };
   }
 
   const nuevasObligaciones = activos.map((s) => ({ socio_id: s.id, anio, mes }));
@@ -236,6 +239,35 @@ export async function registrarAporteVoluntario(socioId, monto, fecha, concepto,
   const { error } = await supabase
     .from("aportes_voluntarios")
     .insert({ socio_id: socioId, monto, fecha, concepto, observaciones });
+  if (error) throw error;
+}
+
+// ---------- Ingresos que no provienen de socios ----------
+export async function listarIngresosExternos() {
+  const { data, error } = await supabase.from("ingresos_externos").select("*").order("fecha", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function registrarIngresoExterno({ fecha, tipo, concepto, origen, monto, observaciones }) {
+  const { error } = await supabase
+    .from("ingresos_externos")
+    .insert({ fecha, tipo, concepto: concepto.trim(), origen: origen?.trim() || null, monto, observaciones: observaciones?.trim() || null });
+  if (error) throw error;
+}
+
+// Editar y eliminar requieren la política de supabase/04_cambios.sql
+// (solo súper administrador).
+export async function editarIngresoExterno(id, { fecha, tipo, concepto, origen, monto, observaciones }) {
+  const { error } = await supabase
+    .from("ingresos_externos")
+    .update({ fecha, tipo, concepto: concepto.trim(), origen: origen?.trim() || null, monto, observaciones: observaciones?.trim() || null })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function eliminarIngresoExterno(id) {
+  const { error } = await supabase.from("ingresos_externos").delete().eq("id", id);
   if (error) throw error;
 }
 
