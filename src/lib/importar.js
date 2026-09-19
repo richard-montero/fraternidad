@@ -72,7 +72,7 @@ function esperar(ms) {
  *   ROLES_ACCESO, CATEGORIAS_GASTO) para traducir las etiquetas del Excel.
  * - onProgreso(hechos, total): callback opcional para una barra de avance.
  */
-export async function importarDatos({ libro, socios, esSuperadmin, estados, roles, categoriasGasto, onProgreso }) {
+export async function importarDatos({ libro, socios, esSuperadmin, estados, roles, turnos, categoriasGasto, onProgreso }) {
   const resultado = { sociosCreados: 0, sociosExistentes: 0, obligacionesCreadas: 0, obligacionesMensualesGeneradas: 0, aportesCreados: 0, gastosCreados: 0, errores: [] };
 
   const mapaCelular = new Map();
@@ -109,6 +109,8 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
     const rolValor = roles.find((r) => normalizar(r.label) === normalizar(campo(fila, "Rol", "Rol de acceso")))?.value || "socio";
     const password = String(campo(fila, "Contraseña inicial", "Contrasena inicial", "Password")).trim();
     const aporteAcordado = Number(campo(fila, "Aporte patrimonial acordado", "Aporte acordado")) || 0;
+    const turnoTxt = String(campo(fila, "Turno")).trim();
+    const turnoValor = (turnos || []).find((t) => normalizar(t) === normalizar(turnoTxt)) || null;
 
     try {
       const socio = await api.crearSocio({
@@ -116,6 +118,7 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
         celular,
         email,
         fechaNacimiento: convertirFecha(campo(fila, "Fecha de nacimiento", "Nacimiento")),
+        turno: turnoValor,
         estado: esSuperadmin ? estadoValor : "patrimonial",
         rol: esSuperadmin ? rolValor : "socio",
         password,

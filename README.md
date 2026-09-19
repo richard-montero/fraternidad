@@ -237,6 +237,13 @@ este software, pero consérvala).
      el rol de un socio (aplicada dentro de la base de datos, no solo en la
      pantalla).
 
+### Paso 9: Ejecutar el script del campo Turno (nuevo)
+1. Vuelve a **SQL Editor** → **New query**.
+2. Abre `supabase/05_turno.sql`, copia todo su contenido y pégalo.
+3. Presiona **Run**. Agrega el campo "Turno" a cada socio, con los doce
+   meses abreviados (Ene…Dic) como valores posibles. Es opcional: puede
+   quedar sin asignar.
+
 ---
 
 ## PARTE 2 — Publicar la aplicación en Netlify
@@ -302,8 +309,9 @@ tocar el código.
 5. Copiar el Project URL y la Publishable key desde Project Settings → API.
 5.b. Ejecutar `supabase/03_mejoras.sql` (habilita editar/eliminar gastos y
    agrega índices).
-5.c. Ejecutar `supabase/04_cambios.sql` (nuevo — fecha de nacimiento, nuevos
+5.c. Ejecutar `supabase/04_cambios.sql` (fecha de nacimiento, nuevos
    estados de socio, rol Supervisor, ingresos institucionales).
+5.d. Ejecutar `supabase/05_turno.sql` (nuevo — campo Turno del socio).
 
 **En Netlify:**
 6. Pegar esas dos claves como variables de entorno (o en un archivo `.env`

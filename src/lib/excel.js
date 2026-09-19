@@ -31,6 +31,7 @@ export function descargarPlantillaImportacion() {
         { hoja: "Socios", columna: "Estado", valores: "Patrimonial / Invitado / De baja (si se deja vacío: Patrimonial)" },
         { hoja: "Socios", columna: "Rol", valores: "Socio / Supervisor / Administrador / Súper administrador (si se deja vacío: Socio)" },
         { hoja: "Socios", columna: "Fecha de nacimiento", valores: "AAAA-MM-DD" },
+        { hoja: "Socios", columna: "Turno", valores: "Ene / Feb / Mar / Abr / May / Jun / Jul / Ago / Sep / Oct / Nov / Dic (opcional)" },
         { hoja: "Socios", columna: "Aporte patrimonial acordado", valores: "Opcional — si se llena, crea automáticamente esa obligación patrimonial" },
         { hoja: "Aportes", columna: "Tipo", valores: "Patrimonial / Mensual / Voluntario / Obligación mensual" },
         { hoja: "Aportes", columna: "Tipo = Patrimonial o Mensual", valores: "Registra un PAGO (Haber) — reduce lo pendiente del socio" },
@@ -48,13 +49,14 @@ export function descargarPlantillaImportacion() {
         { label: "Celular", get: (f) => f.celular },
         { label: "Correo electronico", get: (f) => f.email },
         { label: "Fecha de nacimiento", get: (f) => f.fechaNacimiento },
+        { label: "Turno", get: (f) => f.turno },
         { label: "Estado", get: (f) => f.estado },
         { label: "Rol", get: (f) => f.rol },
         { label: "Aporte patrimonial acordado", get: (f) => f.aporteAcordado },
         { label: "Contraseña inicial", get: (f) => f.password },
       ],
       filas: [
-        { nombre: "Juan Pérez Rodríguez", celular: "71234567", email: "juan.perez@ejemplo.com", fechaNacimiento: "1985-04-12", estado: "Patrimonial", rol: "Socio", aporteAcordado: 5000, password: "" },
+        { nombre: "Juan Pérez Rodríguez", celular: "71234567", email: "juan.perez@ejemplo.com", fechaNacimiento: "1985-04-12", turno: "Mar", estado: "Patrimonial", rol: "Socio", aporteAcordado: 5000, password: "" },
       ],
     },
     {

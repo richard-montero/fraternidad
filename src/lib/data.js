@@ -59,7 +59,7 @@ export async function listarSocios() {
   return data;
 }
 
-export async function crearSocio({ nombre, celular, email, fechaNacimiento, rol = "socio", estado = "patrimonial", password }) {
+export async function crearSocio({ nombre, celular, email, fechaNacimiento, turno, rol = "socio", estado = "patrimonial", password }) {
   const passwordFinal = password && password.trim().length >= 6 ? password.trim() : "123456";
   const authUserId = await crearUsuarioDeAcceso(email.trim(), passwordFinal);
 
@@ -71,6 +71,7 @@ export async function crearSocio({ nombre, celular, email, fechaNacimiento, rol 
       celular: celular.trim(),
       email: email.trim(),
       fecha_nacimiento: fechaNacimiento || null,
+      turno: turno || null,
       codigo: generarCodigoSocio(),
       estado,
       rol,
@@ -94,10 +95,10 @@ export async function cambiarRolSocio(socioId, nuevoRol) {
   if (error) throw error;
 }
 
-export async function editarSocio(socioId, { nombre, celular, email, fechaNacimiento }) {
+export async function editarSocio(socioId, { nombre, celular, email, fechaNacimiento, turno }) {
   const { error } = await supabase
     .from("socios")
-    .update({ nombre: nombre.trim(), celular: celular.trim(), email: email.trim(), fecha_nacimiento: fechaNacimiento || null })
+    .update({ nombre: nombre.trim(), celular: celular.trim(), email: email.trim(), fecha_nacimiento: fechaNacimiento || null, turno: turno || null })
     .eq("id", socioId);
   if (error) throw error;
 }

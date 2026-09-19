@@ -26,6 +26,8 @@ const ESTADOS_SOCIO = [
   { value: "de_baja", label: "De baja" },
 ];
 
+const TURNOS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
 // ---------------------------------------------------------------------
 // Utilidades
 // ---------------------------------------------------------------------
@@ -716,6 +718,7 @@ function Socios({ ctx, irAFicha }) {
   const [celular, setCelular] = useState("");
   const [email, setEmail] = useState("");
   const [fechaNac, setFechaNac] = useState("");
+  const [turnoNuevo, setTurnoNuevo] = useState("");
   const [estadoNuevo, setEstadoNuevo] = useState("patrimonial");
   const [rolNuevo, setRolNuevo] = useState("socio");
   const [passwordNuevo, setPasswordNuevo] = useState("");
@@ -726,7 +729,7 @@ function Socios({ ctx, irAFicha }) {
   const [tabDetalle, setTabDetalle] = useState("datos");
   const [rolEdit, setRolEdit] = useState("socio");
   const [estadoEdit, setEstadoEdit] = useState("patrimonial");
-  const [datosEdit, setDatosEdit] = useState({ nombre: "", celular: "", email: "", fechaNacimiento: "" });
+  const [datosEdit, setDatosEdit] = useState({ nombre: "", celular: "", email: "", fechaNacimiento: "", turno: "" });
   const [mensajeDetalle, setMensajeDetalle] = useState(null);
   const [guardandoDetalle, setGuardandoDetalle] = useState(false);
 
@@ -758,12 +761,13 @@ function Socios({ ctx, irAFicha }) {
         celular: celular.trim(),
         email: email.trim(),
         fechaNacimiento: fechaNac || null,
+        turno: turnoNuevo || null,
         estado: esSuperadmin ? estadoNuevo : "patrimonial",
         rol: esSuperadmin ? rolNuevo : "socio",
         password: esSuperadmin ? passwordNuevo : "",
       });
       aviso.exito(`Socio ${nombre.trim()} registrado correctamente.`);
-      setNombre(""); setCelular(""); setEmail(""); setFechaNac(""); setEstadoNuevo("patrimonial"); setRolNuevo("socio"); setPasswordNuevo(""); setMostrarForm(false);
+      setNombre(""); setCelular(""); setEmail(""); setFechaNac(""); setTurnoNuevo(""); setEstadoNuevo("patrimonial"); setRolNuevo("socio"); setPasswordNuevo(""); setMostrarForm(false);
     } catch (err) {
       setError(err.message || "No se pudo registrar el socio.");
     } finally {
@@ -777,7 +781,7 @@ function Socios({ ctx, irAFicha }) {
     setTabDetalle("datos");
     setRolEdit(socio.rol);
     setEstadoEdit(socio.estado);
-    setDatosEdit({ nombre: socio.nombre, celular: socio.celular, email: socio.email || "", fechaNacimiento: socio.fecha_nacimiento || "" });
+    setDatosEdit({ nombre: socio.nombre, celular: socio.celular, email: socio.email || "", fechaNacimiento: socio.fecha_nacimiento || "", turno: socio.turno || "" });
     setMensajeDetalle(null);
   }
 
@@ -846,6 +850,12 @@ function Socios({ ctx, irAFicha }) {
             <Field label="Número de celular"><input className="field-input" required value={celular} onChange={(e) => setCelular(e.target.value)} /></Field>
             <Field label="Correo electrónico (será su usuario para ingresar)"><input className="field-input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
             <Field label="Fecha de nacimiento"><input className="field-input" type="date" value={fechaNac} onChange={(e) => setFechaNac(e.target.value)} /></Field>
+            <Field label="Turno">
+              <select className="field-input" value={turnoNuevo} onChange={(e) => setTurnoNuevo(e.target.value)}>
+                <option value="">Sin asignar</option>
+                {TURNOS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
             {esSuperadmin ? (
               <>
                 <Field label="Estado del socio">
@@ -882,6 +892,7 @@ function Socios({ ctx, irAFicha }) {
                   <Th col="celular">Celular</Th>
                   <Th col="codigo">Código</Th>
                   <Th col="estado">Estado</Th>
+                  <Th col="turno">Turno</Th>
                   <th>Rol de acceso</th>
                   <th></th>
                 </tr>
@@ -894,6 +905,7 @@ function Socios({ ctx, irAFicha }) {
                       <td>{s.celular}</td>
                       <td>{s.codigo}</td>
                       <td><Badge tono={tonoEstado(s.estado)}>{etiquetaEstado(s.estado)}</Badge></td>
+                      <td>{s.turno || "—"}</td>
                       <td><Badge tono={tonoRol(s.rol)}>{etiquetaRol(s.rol)}</Badge></td>
                       <td>
                         <div className="flex items-center gap-3 justify-end">
@@ -910,7 +922,7 @@ function Socios({ ctx, irAFicha }) {
                     </tr>
                     {detalleId === s.id && puedeEscribir && (
                       <tr>
-                        <td colSpan={6} style={{ background: "var(--paper)", borderBottom: "1px solid var(--line)" }}>
+                        <td colSpan={7} style={{ background: "var(--paper)", borderBottom: "1px solid var(--line)" }}>
                           <div style={{ padding: "16px 4px" }}>
                             <div className="flex gap-1 mb-4" style={{ borderBottom: "1px solid var(--line-strong)" }}>
                               {["datos", ...(esSuperadmin ? ["acceso"] : [])].map((t) => (
@@ -937,6 +949,12 @@ function Socios({ ctx, irAFicha }) {
                                   <Field label="Celular"><input className="field-input" value={datosEdit.celular} onChange={(e) => setDatosEdit((d) => ({ ...d, celular: e.target.value }))} /></Field>
                                   <Field label="Correo electrónico"><input className="field-input" type="email" value={datosEdit.email} onChange={(e) => setDatosEdit((d) => ({ ...d, email: e.target.value }))} /></Field>
                                   <Field label="Fecha de nacimiento"><input className="field-input" type="date" value={datosEdit.fechaNacimiento || ""} onChange={(e) => setDatosEdit((d) => ({ ...d, fechaNacimiento: e.target.value }))} /></Field>
+                                  <Field label="Turno">
+                                    <select className="field-input" value={datosEdit.turno || ""} onChange={(e) => setDatosEdit((d) => ({ ...d, turno: e.target.value }))}>
+                                      <option value="">Sin asignar</option>
+                                      {TURNOS.map((t) => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                  </Field>
                                 </div>
                                 <div className="mt-3"><Btn onClick={() => guardarDatos(s)} disabled={guardandoDetalle}>{guardandoDetalle ? "Guardando…" : "Guardar datos"}</Btn></div>
                               </>
@@ -1055,6 +1073,7 @@ function FichaGeneral({ ctx, socio }) {
           <div><div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Correo</div><div>{socio.email || "—"}</div></div>
           <div><div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Celular</div><div>{socio.celular}</div></div>
           <div><div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Fecha de nacimiento</div><div>{socio.fecha_nacimiento ? fdate(socio.fecha_nacimiento) : "—"}</div></div>
+          <div><div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Turno</div><div>{socio.turno || "—"}</div></div>
           <div><div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>Código</div><div>{socio.codigo}</div></div>
         </div>
       </Card>
@@ -2274,6 +2293,7 @@ function ImportadorExcel({ ctx }) {
         esSuperadmin,
         estados: ESTADOS_SOCIO,
         roles: ROLES_ACCESO,
+        turnos: TURNOS,
         categoriasGasto: CATEGORIAS_GASTO,
         onProgreso: (hechos, total) => setProgreso({ hechos, total }),
       });
