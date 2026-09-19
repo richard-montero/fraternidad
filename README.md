@@ -124,6 +124,38 @@ imprimir, sin depender de una librería adicional.
 
 ---
 
+## 🆕 Importar datos desde Excel
+
+Desde **Configuración anual** (solo administrador/súper administrador) hay
+una sección **"Importar datos desde Excel"**:
+
+1. Descarga la plantilla con el botón correspondiente — trae 3 hojas
+   (**Socios**, **Aportes**, **Gastos**) con los encabezados correctos y
+   una fila de ejemplo en cada una.
+2. Llena la plantilla con tus datos (puedes dejar hojas vacías si no las
+   necesitas) y guárdala.
+3. Súbela y presiona "Iniciar importación".
+
+Cómo funciona:
+- Los socios se identifican por su **celular**: si ya existe un socio con
+  ese celular, esa fila se omite (nunca se duplica).
+- Si en la hoja Socios pones un monto en "Aporte patrimonial acordado",
+  se crea automáticamente esa obligación patrimonial para ese socio.
+- En la hoja Aportes, la columna "Celular" debe coincidir con el celular
+  de un socio ya existente o recién creado en la hoja Socios.
+- Si no eres súper administrador, todo socio nuevo se crea como
+  Patrimonial/Socio sin importar lo que diga el Excel (misma regla que el
+  formulario manual).
+- Al terminar, se muestra un resumen y el detalle de cualquier fila que no
+  se pudo procesar (con el número de fila y el motivo), sin que eso
+  detenga el resto de la importación.
+- Como cada socio nuevo requiere crear su usuario de acceso, la
+  importación hace una breve pausa entre cada uno — para muchos socios
+  puede tardar uno o dos minutos; no cierres la pestaña mientras dice
+  "Importando…".
+
+---
+
 ## PARTE 1 — Configurar la base de datos en Supabase
 
 ### Paso 1: Crear el proyecto

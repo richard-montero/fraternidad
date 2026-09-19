@@ -8,7 +8,8 @@ import { supabase } from "./lib/supabaseClient.js";
 import * as api from "./lib/data.js";
 import { useAppData } from "./hooks/useAppData.js";
 import { exportarCSV } from "./lib/csv.js";
-import { exportarExcel } from "./lib/excel.js";
+import { exportarExcel, descargarPlantillaImportacion } from "./lib/excel.js";
+import { leerLibroExcel, importarDatos } from "./lib/importar.js";
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
@@ -2220,7 +2221,7 @@ function Configuracion({ ctx }) {
         <div className="mt-4"><Btn onClick={generar} disabled={generando}>{generando ? "Generando…" : "Generar mensualidades"}</Btn></div>
       </Card>
 
-      <Card>
+      <Card style={{ marginBottom: 20 }}>
         <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Historial de cuotas por año</h3>
         {ctx.configAnual.length === 0 ? <Vacio>Aún no se definió ninguna cuota.</Vacio> : (
           <table className="ledger">
@@ -2233,7 +2234,118 @@ function Configuracion({ ctx }) {
           </table>
         )}
       </Card>
+
+      <ImportadorExcel ctx={ctx} />
     </div>
+  );
+}
+
+// =====================================================================
+// IMPORTAR DATOS DESDE EXCEL
+// =====================================================================
+function ImportadorExcel({ ctx }) {
+  const [archivo, setArchivo] = useState(null);
+  const [procesando, setProcesando] = useState(false);
+  const [progreso, setProgreso] = useState(null);
+  const [resultado, setResultado] = useState(null);
+  const [error, setError] = useState(null);
+
+  const esSuperadmin = ctx.sesion.rol === "superadmin";
+
+  async function iniciar() {
+    if (!archivo) return;
+    setError(null);
+    setResultado(null);
+
+    const ok = await ctx.confirmar({
+      titulo: "Importar datos desde Excel",
+      mensaje: "Se crearán socios, aportes y/o gastos según las filas del archivo. Esta acción no se puede deshacer automáticamente (aunque siempre puedes editar o anular cada registro después). ¿Continuar?",
+      textoConfirmar: "Importar",
+    });
+    if (!ok) return;
+
+    setProcesando(true);
+    setProgreso({ hechos: 0, total: 1 });
+    try {
+      const libro = await leerLibroExcel(archivo);
+      const r = await importarDatos({
+        libro,
+        socios: ctx.socios,
+        esSuperadmin,
+        estados: ESTADOS_SOCIO,
+        roles: ROLES_ACCESO,
+        categoriasGasto: CATEGORIAS_GASTO,
+        onProgreso: (hechos, total) => setProgreso({ hechos, total }),
+      });
+      setResultado(r);
+      if (r.errores.length === 0) aviso.exito("Importación completada sin errores.");
+      else aviso.error(`Importación completada con ${r.errores.length} fila(s) con problemas — revisa el detalle abajo.`);
+    } catch (err) {
+      setError(err.message || "No se pudo procesar el archivo.");
+    } finally {
+      setProcesando(false);
+      setArchivo(null);
+    }
+  }
+
+  return (
+    <Card style={{ marginTop: 20 }}>
+      <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Importar datos desde Excel</h3>
+      <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+        Sube un Excel con hasta 3 hojas — <b>Socios</b>, <b>Aportes</b> y <b>Gastos</b> — para cargar
+        varios registros de una sola vez. Los socios se identifican por su celular: si el celular ya
+        existe, esa fila se omite (no se duplica).
+        {!esSuperadmin && " Como no eres súper administrador, todos los socios nuevos se crearán como Patrimonial / Socio, sin importar lo que diga el Excel."}
+      </p>
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        <Btn variante="secondary" icon={Download} onClick={descargarPlantillaImportacion}>Descargar plantilla</Btn>
+      </div>
+
+      {error && <Mensaje tipo="error">{error}</Mensaje>}
+
+      <div className="flex items-end gap-3 flex-wrap">
+        <Field label="Archivo Excel (.xlsx) ya llenado">
+          <input
+            className="field-input"
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={(e) => { setArchivo(e.target.files?.[0] || null); setResultado(null); setError(null); }}
+          />
+        </Field>
+        <Btn onClick={iniciar} disabled={!archivo || procesando}>
+          {procesando ? "Importando…" : "Iniciar importación"}
+        </Btn>
+      </div>
+
+      {procesando && progreso && (
+        <div className="mt-4">
+          <div className="barra-track"><div className="barra-fill" style={{ width: `${Math.round((progreso.hechos / Math.max(progreso.total, 1)) * 100)}%`, background: "var(--gold)" }} /></div>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 6 }}>Procesando fila {progreso.hechos} de {progreso.total}…</p>
+        </div>
+      )}
+
+      {resultado && (
+        <div className="mt-5">
+          <div className="grid gap-3.5 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
+            <StatCard label="Socios creados" value={resultado.sociosCreados} tono="positivo" />
+            <StatCard label="Socios ya existentes (omitidos)" value={resultado.sociosExistentes} />
+            <StatCard label="Aportes registrados" value={resultado.aportesCreados} tono="positivo" />
+            <StatCard label="Gastos registrados" value={resultado.gastosCreados} tono="positivo" />
+          </div>
+          {resultado.errores.length > 0 && (
+            <div>
+              <h4 style={{ color: "var(--rust)", fontSize: "0.9rem", marginBottom: 6 }}>Filas con problemas ({resultado.errores.length})</h4>
+              <div style={{ maxHeight: 240, overflowY: "auto", border: "1px solid var(--line)", borderRadius: 6, padding: "8px 12px" }}>
+                {resultado.errores.map((e, i) => (
+                  <div key={i} style={{ fontSize: "0.82rem", color: "var(--text-muted)", padding: "4px 0", borderBottom: i < resultado.errores.length - 1 ? "1px solid var(--line)" : "none" }}>{e}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 

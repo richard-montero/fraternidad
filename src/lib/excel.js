@@ -15,3 +15,55 @@ export function exportarExcel(nombreArchivo, hojas) {
   });
   XLSX.writeFile(libro, nombreArchivo.endsWith(".xlsx") ? nombreArchivo : `${nombreArchivo}.xlsx`);
 }
+
+// Plantilla lista para llenar, con una fila de ejemplo en cada hoja, para
+// la importación masiva de socios + aportes + gastos.
+export function descargarPlantillaImportacion() {
+  exportarExcel("plantilla_importacion_fraternidad", [
+    {
+      nombre: "Socios",
+      columnas: [
+        { label: "Nombre completo", get: (f) => f.nombre },
+        { label: "Celular", get: (f) => f.celular },
+        { label: "Correo electronico", get: (f) => f.email },
+        { label: "Fecha de nacimiento", get: (f) => f.fechaNacimiento },
+        { label: "Estado", get: (f) => f.estado },
+        { label: "Rol", get: (f) => f.rol },
+        { label: "Aporte patrimonial acordado", get: (f) => f.aporteAcordado },
+        { label: "Contraseña inicial", get: (f) => f.password },
+      ],
+      filas: [
+        { nombre: "Juan Pérez Rodríguez", celular: "71234567", email: "juan.perez@ejemplo.com", fechaNacimiento: "1985-04-12", estado: "Patrimonial", rol: "Socio", aporteAcordado: 5000, password: "" },
+      ],
+    },
+    {
+      nombre: "Aportes",
+      columnas: [
+        { label: "Celular", get: (f) => f.celular },
+        { label: "Tipo", get: (f) => f.tipo },
+        { label: "Fecha", get: (f) => f.fecha },
+        { label: "Monto", get: (f) => f.monto },
+        { label: "Concepto", get: (f) => f.concepto },
+        { label: "Observaciones", get: (f) => f.observaciones },
+      ],
+      filas: [
+        { celular: "71234567", tipo: "Patrimonial", fecha: "2024-03-10", monto: 1000, concepto: "Pago patrimonial", observaciones: "" },
+        { celular: "71234567", tipo: "Mensual", fecha: "2024-03-10", monto: 50, concepto: "Mensualidad marzo 2024", observaciones: "" },
+      ],
+    },
+    {
+      nombre: "Gastos",
+      columnas: [
+        { label: "Fecha", get: (f) => f.fecha },
+        { label: "Categoria", get: (f) => f.categoria },
+        { label: "Concepto", get: (f) => f.concepto },
+        { label: "Beneficiario", get: (f) => f.beneficiario },
+        { label: "Monto", get: (f) => f.monto },
+        { label: "Forma de pago", get: (f) => f.formaPago },
+      ],
+      filas: [
+        { fecha: "2024-03-05", categoria: "Servicios básicos — Saguapac", concepto: "Factura de agua marzo", beneficiario: "Saguapac", monto: 120, formaPago: "Transferencia" },
+      ],
+    },
+  ]);
+}
