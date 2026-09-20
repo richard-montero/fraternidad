@@ -857,6 +857,9 @@ function Socios({ ctx, irAFicha }) {
   const [datosEdit, setDatosEdit] = useState({ nombre: "", celular: "", email: "", fechaNacimiento: "", turno: "" });
   const [mensajeDetalle, setMensajeDetalle] = useState(null);
   const [guardandoDetalle, setGuardandoDetalle] = useState(false);
+  const [correoActivar, setCorreoActivar] = useState("");
+  const [passwordActivar, setPasswordActivar] = useState("");
+  const [activando, setActivando] = useState(false);
 
   const esSuperadmin = ctx.sesion.rol === "superadmin";
   const puedeEscribir = puedeEditar(ctx.sesion.rol);
@@ -902,10 +905,11 @@ function Socios({ ctx, irAFicha }) {
   function abrirDetalle(socio) {
     if (detalleId === socio.id) { setDetalleId(null); return; }
     setDetalleId(socio.id);
-    setTabDetalle("datos");
+    setTabDetalle(socio.auth_user_id ? "datos" : "crear_acceso");
     setRolEdit(socio.rol);
     setEstadoEdit(socio.estado);
     setDatosEdit({ nombre: socio.nombre, celular: socio.celular, email: socio.email || "", fechaNacimiento: socio.fecha_nacimiento || "", turno: socio.turno || "" });
+    setCorreoActivar(""); setPasswordActivar("");
     setMensajeDetalle(null);
   }
 
@@ -920,6 +924,21 @@ function Socios({ ctx, irAFicha }) {
       setMensajeDetalle({ tipo: "error", texto: err.message || "No se pudieron guardar los datos." });
     } finally {
       setGuardandoDetalle(false);
+    }
+  }
+
+  async function activarAcceso(socio) {
+    setActivando(true);
+    setMensajeDetalle(null);
+    try {
+      await ctx.activarAccesoSocio(socio.id, socio.celular, { email: correoActivar, password: passwordActivar });
+      const correoUsado = correoActivar.trim() || api.correoTemporalDesdeCelular(socio.celular);
+      setMensajeDetalle({ tipo: "exito", texto: `Acceso creado. Correo: ${correoUsado} · Contraseña: ${passwordActivar.trim() || "123456"}` });
+      aviso.exito(`Acceso creado para ${socio.nombre}.`);
+    } catch (err) {
+      setMensajeDetalle({ tipo: "error", texto: err.message || "No se pudo crear el acceso (revisa si llegaste al límite de cuentas por hora de Supabase)." });
+    } finally {
+      setActivando(false);
     }
   }
 
@@ -1041,6 +1060,7 @@ function Socios({ ctx, irAFicha }) {
                       <td>
                         <span className="flex items-center gap-1.5 flex-wrap">
                           {s.nombre}
+                          {!s.auth_user_id && <Badge tono="rojo">Sin acceso</Badge>}
                           {s.requiere_configuracion_inicial && <Badge tono="dorado">Primer ingreso pendiente</Badge>}
                         </span>
                       </td>
@@ -1067,7 +1087,7 @@ function Socios({ ctx, irAFicha }) {
                         <td colSpan={7} style={{ background: "var(--paper)", borderBottom: "1px solid var(--line)" }}>
                           <div style={{ padding: "16px 4px" }}>
                             <div className="flex gap-1 mb-4" style={{ borderBottom: "1px solid var(--line-strong)" }}>
-                              {["datos", ...(esSuperadmin ? ["acceso"] : [])].map((t) => (
+                              {["datos", ...(!s.auth_user_id ? ["crear_acceso"] : []), ...(esSuperadmin ? ["acceso"] : [])].map((t) => (
                                 <button
                                   key={t}
                                   onClick={() => { setTabDetalle(t); setMensajeDetalle(null); }}
@@ -1077,12 +1097,30 @@ function Socios({ ctx, irAFicha }) {
                                     borderBottom: tabDetalle === t ? "2px solid var(--gold)" : "2px solid transparent", marginBottom: -1,
                                   }}
                                 >
-                                  {t === "datos" ? "Editar datos" : "Estado y rol de acceso"}
+                                  {t === "datos" ? "Editar datos" : t === "crear_acceso" ? "Crear acceso" : "Estado y rol de acceso"}
                                 </button>
                               ))}
                             </div>
 
                             {mensajeDetalle && <Mensaje tipo={mensajeDetalle.tipo}>{mensajeDetalle.texto}</Mensaje>}
+
+                            {tabDetalle === "crear_acceso" && !s.auth_user_id && (
+                              <>
+                                <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 0 }}>
+                                  Este socio todavía no tiene cuenta para iniciar sesión (así quedan los importados desde Excel).
+                                  Créala aquí de a una — nunca en lote, porque Supabase limita cuántas cuentas se pueden crear por hora.
+                                </p>
+                                <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+                                  <Field label="Correo real (opcional — vacío = correo temporal)">
+                                    <input className="field-input" type="email" placeholder={api.correoTemporalDesdeCelular(s.celular)} value={correoActivar} onChange={(e) => setCorreoActivar(e.target.value)} />
+                                  </Field>
+                                  <Field label="Contraseña inicial (opcional, mín. 6 — vacío = 123456)">
+                                    <input className="field-input" value={passwordActivar} onChange={(e) => setPasswordActivar(e.target.value)} />
+                                  </Field>
+                                </div>
+                                <div className="mt-3"><Btn onClick={() => activarAcceso(s)} disabled={activando}>{activando ? "Creando…" : "Activar acceso"}</Btn></div>
+                              </>
+                            )}
 
                             {tabDetalle === "datos" && (
                               <>
@@ -2493,10 +2531,11 @@ function ImportadorExcel({ ctx }) {
       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
         Sube un Excel con hasta 4 hojas — <b>Socios</b>, <b>Aportes</b>, <b>Ingresos institucionales</b> y{" "}
         <b>Gastos</b> — para cargar varios registros de una sola vez. Los socios se identifican por su
-        celular: si el celular ya existe, esa fila se omite (no se duplica). Si no conoces el correo de
-        un socio, deja esa columna vacía (puedes hasta inventar el celular, ej. 70000001, 70000002…) —
-        se le genera un correo temporal y él mismo define su correo real y su contraseña en su primer
-        ingreso. En Aportes, usa el tipo{" "}
+        celular: si no conoces el celular real de alguno, puedes inventar un número correlativo único
+        (ej. 70000001, 70000002…). Un socio importado <b>todavía no tiene cuenta de acceso</b> — Supabase
+        limita cuántas cuentas se pueden crear por hora, así que la importación nunca las crea en lote;
+        actívalas de a una desde la tabla de Socios (botón "Activar acceso") cuando cada socio esté listo
+        para usar el sistema. En Aportes, usa el tipo{" "}
         <b>"Obligación mensual"</b> para cargar lo que se le cargó al socio ese mes (Debe), y{" "}
         <b>"Mensual"</b> para el pago que hizo (Haber) — son dos cosas distintas. Los ingresos que no
         vienen de un socio (alquiler, donaciones, otros) van en su propia hoja. La hoja "Instrucciones"
@@ -2535,7 +2574,7 @@ function ImportadorExcel({ ctx }) {
         <div className="mt-5">
           <div className="grid gap-3.5 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
             <StatCard label="Socios creados" value={resultado.sociosCreados} tono="positivo" />
-            <StatCard label="Con correo temporal (pendientes)" value={resultado.sociosConCorreoTemporal} />
+            <StatCard label="Sin acceso todavía (activar en Socios)" value={resultado.sociosSinAcceso} />
             <StatCard label="Socios ya existentes (omitidos)" value={resultado.sociosExistentes} />
             <StatCard label="Obligaciones mensuales generadas" value={resultado.obligacionesMensualesGeneradas} tono="positivo" />
             <StatCard label="Aportes (pagos) registrados" value={resultado.aportesCreados} tono="positivo" />

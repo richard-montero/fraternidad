@@ -100,6 +100,7 @@ export function useAppData(sesion) {
   const acciones = {
     crearSocio: (datos) => accion(() => api.crearSocio(datos)),
     editarSocio: (id, datos) => accion(() => api.editarSocio(id, datos)),
+    activarAccesoSocio: (id, celular, datos) => accion(() => api.activarAccesoSocio(id, celular, datos)),
     cambiarEstadoSocio: (id, estado) => accion(() => api.cambiarEstadoSocio(id, estado)),
     cambiarRolSocio: (id, rol) => accion(() => api.cambiarRolSocio(id, rol)),
     enviarRestablecimientoPassword: (email) => api.enviarRestablecimientoPassword(email),

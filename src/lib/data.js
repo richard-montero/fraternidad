@@ -81,14 +81,21 @@ export function correoTemporalDesdeCelular(celular) {
   return `${celular.trim().replace(/\s+/g, "")}@temporal.fraternidad`;
 }
 
-export async function crearSocio({ nombre, celular, email, fechaNacimiento, turno, rol = "socio", estado = "patrimonial", password }) {
+export async function crearSocio({ nombre, celular, email, fechaNacimiento, turno, rol = "socio", estado = "patrimonial", password, crearAcceso = true }) {
   const celularLimpio = celular.trim();
   const correoReal = email?.trim();
-  const usaCorreoTemporal = !correoReal;
-  const correoFinal = correoReal || correoTemporalDesdeCelular(celularLimpio);
 
-  const passwordFinal = password && password.trim().length >= 6 ? password.trim() : "123456";
-  const authUserId = await crearUsuarioDeAcceso(correoFinal, passwordFinal);
+  let authUserId = null;
+  let correoFinal = correoReal || null;
+  let requiereConfig = false;
+
+  if (crearAcceso) {
+    const usaCorreoTemporal = !correoReal;
+    correoFinal = correoReal || correoTemporalDesdeCelular(celularLimpio);
+    const passwordFinal = password && password.trim().length >= 6 ? password.trim() : "123456";
+    authUserId = await crearUsuarioDeAcceso(correoFinal, passwordFinal);
+    requiereConfig = usaCorreoTemporal;
+  }
 
   const { data, error } = await supabase
     .from("socios")
@@ -102,12 +109,31 @@ export async function crearSocio({ nombre, celular, email, fechaNacimiento, turn
       codigo: generarCodigoSocio(),
       estado,
       rol,
-      requiere_configuracion_inicial: usaCorreoTemporal,
+      requiere_configuracion_inicial: requiereConfig,
     })
     .select()
     .single();
   if (error) throw error;
   return data;
+}
+
+// Crea la cuenta de acceso (auth.users) para un socio que se registró
+// SIN una — por ejemplo, uno importado desde Excel. Se llama de a uno
+// por vez (nunca en lote), porque Supabase limita cuántas cuentas se
+// pueden crear por hora desde el correo integrado (ver README).
+export async function activarAccesoSocio(socioId, celular, { email, password }) {
+  const correoReal = email?.trim();
+  const usaCorreoTemporal = !correoReal;
+  const correoFinal = correoReal || correoTemporalDesdeCelular(celular);
+  const passwordFinal = password && password.trim().length >= 6 ? password.trim() : "123456";
+
+  const authUserId = await crearUsuarioDeAcceso(correoFinal, passwordFinal);
+
+  const { error } = await supabase
+    .from("socios")
+    .update({ auth_user_id: authUserId, email: correoFinal, requiere_configuracion_inicial: usaCorreoTemporal })
+    .eq("id", socioId);
+  if (error) throw error;
 }
 
 // Primer ingreso con credenciales temporales: el propio socio define su

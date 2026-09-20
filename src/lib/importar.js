@@ -57,10 +57,6 @@ function hoyISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function esperar(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
 /**
  * Ejecuta la importación completa.
  * - libro: el resultado de leerLibroExcel().
@@ -73,7 +69,7 @@ function esperar(ms) {
  * - onProgreso(hechos, total): callback opcional para una barra de avance.
  */
 export async function importarDatos({ libro, socios, esSuperadmin, estados, roles, turnos, categoriasGasto, onProgreso }) {
-  const resultado = { sociosCreados: 0, sociosConCorreoTemporal: 0, sociosExistentes: 0, obligacionesCreadas: 0, obligacionesMensualesGeneradas: 0, aportesCreados: 0, ingresosExternosCreados: 0, gastosCreados: 0, errores: [] };
+  const resultado = { sociosCreados: 0, sociosSinAcceso: 0, sociosExistentes: 0, obligacionesCreadas: 0, obligacionesMensualesGeneradas: 0, aportesCreados: 0, ingresosExternosCreados: 0, gastosCreados: 0, errores: [] };
 
   const mapaCelular = new Map();
   socios.forEach((s) => mapaCelular.set(normalizar(s.celular), s.id));
@@ -108,7 +104,6 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
 
     const estadoValor = estados.find((e) => normalizar(e.label) === normalizar(campo(fila, "Estado")))?.value || "patrimonial";
     const rolValor = roles.find((r) => normalizar(r.label) === normalizar(campo(fila, "Rol", "Rol de acceso")))?.value || "socio";
-    const password = String(campo(fila, "Contraseña inicial", "Contrasena inicial", "Password")).trim();
     const aporteAcordado = Number(campo(fila, "Aporte patrimonial acordado", "Aporte acordado")) || 0;
     const turnoTxt = String(campo(fila, "Turno")).trim();
     const turnoValor = (turnos || []).find((t) => normalizar(t) === normalizar(turnoTxt)) || null;
@@ -117,21 +112,20 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
       const socio = await api.crearSocio({
         nombre: nombre || celular,
         celular,
-        email,
+        email: email || null,
         fechaNacimiento: convertirFecha(campo(fila, "Fecha de nacimiento", "Nacimiento")),
         turno: turnoValor,
         estado: esSuperadmin ? estadoValor : "patrimonial",
         rol: esSuperadmin ? rolValor : "socio",
-        password,
+        crearAcceso: false, // la cuenta de acceso se activa después, una por una (ver Socios → Activar acceso)
       });
       mapaCelular.set(claveCel, socio.id);
       resultado.sociosCreados++;
-      if (!email) resultado.sociosConCorreoTemporal++;
+      resultado.sociosSinAcceso++;
       if (aporteAcordado > 0) {
         await api.crearObligacionPatrimonial(socio.id, aporteAcordado, hoyISO());
         resultado.obligacionesCreadas++;
       }
-      await esperar(350); // evita saturar el registro de usuarios de Supabase Auth
     } catch (err) {
       resultado.errores.push(`Socios, fila ${i + 2} (${nombre || celular}): ${err.message}`);
     }

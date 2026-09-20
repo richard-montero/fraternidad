@@ -29,7 +29,7 @@ export function descargarPlantillaImportacion() {
       ],
       filas: [
         { hoja: "Socios", columna: "Celular", valores: "Obligatorio y único. Si no conoces el celular real de un socio, puedes inventar un número correlativo (ej. 70000001, 70000002...) — solo debe ser único." },
-        { hoja: "Socios", columna: "Correo electronico", valores: "Opcional. Si lo dejas vacío, se genera un correo temporal a partir del celular (ej. 70000001@temporal.fraternidad) y ese socio deberá definir su correo real y su contraseña la primera vez que ingrese." },
+        { hoja: "Socios", columna: "Correo electronico", valores: "Opcional. Se guarda como dato, pero la importación NUNCA crea la cuenta de acceso (Supabase limita cuántas se crean por hora) — actívala luego de a una desde Socios → \"Activar acceso\"." },
         { hoja: "Socios", columna: "Estado", valores: "Patrimonial / Invitado / De baja (si se deja vacío: Patrimonial)" },
         { hoja: "Socios", columna: "Rol", valores: "Socio / Supervisor / Administrador / Súper administrador (si se deja vacío: Socio)" },
         { hoja: "Socios", columna: "Fecha de nacimiento", valores: "AAAA-MM-DD" },
@@ -58,11 +58,10 @@ export function descargarPlantillaImportacion() {
         { label: "Estado", get: (f) => f.estado },
         { label: "Rol", get: (f) => f.rol },
         { label: "Aporte patrimonial acordado", get: (f) => f.aporteAcordado },
-        { label: "Contraseña inicial", get: (f) => f.password },
       ],
       filas: [
-        { nombre: "Juan Pérez Rodríguez", celular: "71234567", email: "juan.perez@ejemplo.com", fechaNacimiento: "1985-04-12", turno: "Mar", estado: "Patrimonial", rol: "Socio", aporteAcordado: 5000, password: "" },
-        { nombre: "María Fernández Ríos", celular: "70000001", email: "", fechaNacimiento: "", turno: "", estado: "Patrimonial", rol: "Socio", aporteAcordado: 5000, password: "" },
+        { nombre: "Juan Pérez Rodríguez", celular: "71234567", email: "juan.perez@ejemplo.com", fechaNacimiento: "1985-04-12", turno: "Mar", estado: "Patrimonial", rol: "Socio", aporteAcordado: 5000 },
+        { nombre: "María Fernández Ríos", celular: "70000001", email: "", fechaNacimiento: "", turno: "", estado: "Patrimonial", rol: "Socio", aporteAcordado: 5000 },
       ],
     },
     {

@@ -299,6 +299,39 @@ propio correo, nunca su rol, estado u otros datos).
 
 ---
 
+## 🆕 Corrección: la importación masiva fallaba por un límite de Supabase
+
+Si importaste muchos socios de una vez y viste errores como **"email rate
+limit exceeded"** (y en cascada, "no se encontró ningún socio con
+celular..." en Aportes), no era un error de la aplicación: es que
+Supabase, sin un proveedor de correo propio configurado, solo deja crear
+un puñado de cuentas de acceso por hora (documentado oficialmente en 2 por
+hora con el correo integrado, o 30/hora si configuras tu propio SMTP) —
+y cada intento de crear una cuenta cuenta contra ese límite, aunque no
+llegue a enviarse ningún correo de verdad. Como antes la importación
+creaba una cuenta de acceso por cada socio, con cientos de socios el
+límite se alcanzaba casi de inmediato y todo lo demás fallaba en cadena.
+
+**La corrección:** ahora importar desde Excel **nunca crea cuentas de
+acceso** — solo crea los registros de los socios (instantáneo, sin
+límite alguno). Cada socio importado queda con la etiqueta **"Sin
+acceso"** en la tabla de Socios. Cuando quieras darle acceso a alguno
+(cuando esté listo para usar el sistema), entra a **Socios → Gestionar
+→ Crear acceso** y créaselo ahí, de a uno — puedes dejar el correo vacío
+para generarle uno temporal (mismo mecanismo de siempre: él define su
+correo real y su contraseña en su primer ingreso).
+
+Si necesitas activar accesos más rápido que de a uno por vez, la forma
+correcta es configurar un proveedor de correo propio en Supabase
+(Authentication → Settings → SMTP Settings) — con eso el límite sube a
+30 cuentas por hora en vez de 2.
+
+No hace falta ejecutar ningún script SQL para esta corrección — la
+columna que vincula al socio con su cuenta de acceso ya admitía quedar
+vacía, así que solo cambió el código.
+
+---
+
 ## 🆕 Correcciones al menú lateral
 
 **1. El menú no se podía usar en el celular** — se corrigió un problema
