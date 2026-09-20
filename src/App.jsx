@@ -2312,12 +2312,13 @@ function ImportadorExcel({ ctx }) {
     <Card style={{ marginTop: 20 }}>
       <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Importar datos desde Excel</h3>
       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-        Sube un Excel con hasta 3 hojas — <b>Socios</b>, <b>Aportes</b> y <b>Gastos</b> — para cargar
-        varios registros de una sola vez. Los socios se identifican por su celular: si el celular ya
-        existe, esa fila se omite (no se duplica). En Aportes, usa el tipo <b>"Obligación mensual"</b>{" "}
-        para cargar lo que se le cargó al socio ese mes (Debe), y <b>"Mensual"</b> para el pago que hizo
-        (Haber) — son dos cosas distintas. La hoja "Instrucciones" de la plantilla explica cada valor
-        permitido.
+        Sube un Excel con hasta 4 hojas — <b>Socios</b>, <b>Aportes</b>, <b>Ingresos institucionales</b> y{" "}
+        <b>Gastos</b> — para cargar varios registros de una sola vez. Los socios se identifican por su
+        celular: si el celular ya existe, esa fila se omite (no se duplica). En Aportes, usa el tipo{" "}
+        <b>"Obligación mensual"</b> para cargar lo que se le cargó al socio ese mes (Debe), y{" "}
+        <b>"Mensual"</b> para el pago que hizo (Haber) — son dos cosas distintas. Los ingresos que no
+        vienen de un socio (alquiler, donaciones, otros) van en su propia hoja. La hoja "Instrucciones"
+        de la plantilla explica cada valor permitido.
         {!esSuperadmin && " Como no eres súper administrador, todos los socios nuevos se crearán como Patrimonial / Socio, sin importar lo que diga el Excel."}
       </p>
 
@@ -2355,6 +2356,7 @@ function ImportadorExcel({ ctx }) {
             <StatCard label="Socios ya existentes (omitidos)" value={resultado.sociosExistentes} />
             <StatCard label="Obligaciones mensuales generadas" value={resultado.obligacionesMensualesGeneradas} tono="positivo" />
             <StatCard label="Aportes (pagos) registrados" value={resultado.aportesCreados} tono="positivo" />
+            <StatCard label="Ingresos institucionales" value={resultado.ingresosExternosCreados} tono="positivo" />
             <StatCard label="Gastos registrados" value={resultado.gastosCreados} tono="positivo" />
           </div>
           {resultado.errores.length > 0 && (

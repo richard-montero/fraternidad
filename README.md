@@ -129,9 +129,9 @@ imprimir, sin depender de una librería adicional.
 Desde **Configuración anual** (solo administrador/súper administrador) hay
 una sección **"Importar datos desde Excel"**:
 
-1. Descarga la plantilla con el botón correspondiente — trae 3 hojas
-   (**Socios**, **Aportes**, **Gastos**) con los encabezados correctos y
-   una fila de ejemplo en cada una.
+1. Descarga la plantilla con el botón correspondiente — trae 4 hojas
+   (**Socios**, **Aportes**, **Ingresos institucionales**, **Gastos**) con
+   los encabezados correctos y una fila de ejemplo en cada una.
 2. Llena la plantilla con tus datos (puedes dejar hojas vacías si no las
    necesitas) y guárdala.
 3. Súbela y presiona "Iniciar importación".
@@ -155,6 +155,9 @@ Cómo funciona:
     una fila de "Obligación mensual" (lo que se le cargó) y, si ya pagó,
     otra fila de "Mensual" (lo que pagó) — la hoja "Instrucciones" de la
     plantilla trae el detalle y un ejemplo de las dos juntas.
+- La hoja **"Ingresos institucionales"** es para los ingresos que NO
+  provienen de un socio: Alquiler, Donación u Otro — no lleva celular, es
+  independiente de la hoja Socios.
 - Si no eres súper administrador, todo socio nuevo se crea como
   Patrimonial/Socio sin importar lo que diga el Excel (misma regla que el
   formulario manual).

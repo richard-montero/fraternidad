@@ -73,16 +73,17 @@ function esperar(ms) {
  * - onProgreso(hechos, total): callback opcional para una barra de avance.
  */
 export async function importarDatos({ libro, socios, esSuperadmin, estados, roles, turnos, categoriasGasto, onProgreso }) {
-  const resultado = { sociosCreados: 0, sociosExistentes: 0, obligacionesCreadas: 0, obligacionesMensualesGeneradas: 0, aportesCreados: 0, gastosCreados: 0, errores: [] };
+  const resultado = { sociosCreados: 0, sociosExistentes: 0, obligacionesCreadas: 0, obligacionesMensualesGeneradas: 0, aportesCreados: 0, ingresosExternosCreados: 0, gastosCreados: 0, errores: [] };
 
   const mapaCelular = new Map();
   socios.forEach((s) => mapaCelular.set(normalizar(s.celular), s.id));
 
   const filasSocios = hojaComoFilas(libro, ["Socios"]);
   const filasAportes = hojaComoFilas(libro, ["Aportes", "Aportes de socios", "Pagos"]);
+  const filasIngresosExternos = hojaComoFilas(libro, ["Ingresos institucionales", "Ingresos externos", "Otros ingresos"]);
   const filasGastos = hojaComoFilas(libro, ["Gastos"]);
 
-  const total = filasSocios.length + filasAportes.length + filasGastos.length;
+  const total = filasSocios.length + filasAportes.length + filasIngresosExternos.length + filasGastos.length;
   let hechos = 0;
   const avanzar = () => { hechos++; onProgreso?.(hechos, total); };
 
@@ -185,7 +186,38 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
     avanzar();
   }
 
-  // ---------- 3) Gastos ----------
+  // ---------- 3) Ingresos institucionales (no provienen de un socio) ----------
+  for (let i = 0; i < filasIngresosExternos.length; i++) {
+    const fila = filasIngresosExternos[i];
+    const tipoTxt = normalizar(campo(fila, "Tipo"));
+    const monto = Number(campo(fila, "Monto"));
+    const fecha = convertirFecha(campo(fila, "Fecha")) || hoyISO();
+    const concepto = String(campo(fila, "Concepto")).trim();
+    const origen = String(campo(fila, "Origen")).trim();
+    const observaciones = String(campo(fila, "Observaciones")).trim();
+
+    const tipoValor = tipoTxt === "alquiler" ? "alquiler" : tipoTxt === "donacion" ? "donacion" : tipoTxt === "otro" || tipoTxt === "otros" ? "otro" : null;
+
+    if (!tipoValor) {
+      resultado.errores.push(`Ingresos institucionales, fila ${i + 2}: el tipo "${campo(fila, "Tipo")}" no se reconoce (usa Alquiler, Donación u Otro).`);
+      avanzar();
+      continue;
+    }
+    if (!concepto || !monto || monto <= 0) {
+      resultado.errores.push(`Ingresos institucionales, fila ${i + 2}: falta el concepto o el monto no es válido.`);
+      avanzar();
+      continue;
+    }
+    try {
+      await api.registrarIngresoExterno({ fecha, tipo: tipoValor, concepto, origen, monto, observaciones });
+      resultado.ingresosExternosCreados++;
+    } catch (err) {
+      resultado.errores.push(`Ingresos institucionales, fila ${i + 2}: ${err.message}`);
+    }
+    avanzar();
+  }
+
+  // ---------- 4) Gastos ----------
   for (let i = 0; i < filasGastos.length; i++) {
     const fila = filasGastos[i];
     const categoria = categoriasGasto.find((c) => normalizar(c.label) === normalizar(campo(fila, "Categoria", "Categoría")))?.value || "otros";

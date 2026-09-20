@@ -37,6 +37,9 @@ export function descargarPlantillaImportacion() {
         { hoja: "Aportes", columna: "Tipo = Patrimonial o Mensual", valores: "Registra un PAGO (Haber) — reduce lo pendiente del socio" },
         { hoja: "Aportes", columna: "Tipo = Obligación mensual", valores: "Registra lo que se le CARGÓ al socio ese mes (Debe) — usa el año y mes de la columna Fecha. No confundir con un pago." },
         { hoja: "Aportes", columna: "Fecha", valores: "AAAA-MM-DD" },
+        { hoja: "Ingresos institucionales", columna: "Tipo", valores: "Alquiler / Donación / Otro" },
+        { hoja: "Ingresos institucionales", columna: "Origen", valores: "Opcional — de quién o qué proviene (ej. nombre del inquilino o donante)" },
+        { hoja: "Ingresos institucionales", columna: "Fecha", valores: "AAAA-MM-DD" },
         { hoja: "Gastos", columna: "Categoria", valores: "Sueldos y salarios / Servicios básicos — Saguapac / Servicios básicos — Cre / Internet y telefonía / Mantenimientos / Otros" },
         { hoja: "Gastos", columna: "Fecha", valores: "AAAA-MM-DD" },
         { hoja: "(todas)", columna: "Celular", valores: "Debe coincidir exactamente entre las hojas Socios y Aportes para emparejar cada fila con su socio" },
@@ -74,6 +77,21 @@ export function descargarPlantillaImportacion() {
         { celular: "71234567", tipo: "Obligación mensual", fecha: "2024-02-01", monto: 50, concepto: "Mensualidad febrero 2024", observaciones: "" },
         { celular: "71234567", tipo: "Mensual", fecha: "2024-02-05", monto: 50, concepto: "Pago mensualidad febrero 2024", observaciones: "" },
         { celular: "71234567", tipo: "Voluntario", fecha: "2024-04-20", monto: 200, concepto: "Aporte voluntario pro-fiesta", observaciones: "Entregado en efectivo" },
+      ],
+    },
+    {
+      nombre: "Ingresos institucionales",
+      columnas: [
+        { label: "Fecha", get: (f) => f.fecha },
+        { label: "Tipo", get: (f) => f.tipo },
+        { label: "Concepto", get: (f) => f.concepto },
+        { label: "Origen", get: (f) => f.origen },
+        { label: "Monto", get: (f) => f.monto },
+        { label: "Observaciones", get: (f) => f.observaciones },
+      ],
+      filas: [
+        { fecha: "2024-03-15", tipo: "Alquiler", concepto: "Alquiler salón de eventos", origen: "Familia Rodríguez", monto: 800, observaciones: "" },
+        { fecha: "2024-03-20", tipo: "Donación", concepto: "Donación pro-mantenimiento", origen: "Empresa ABC S.R.L.", monto: 500, observaciones: "" },
       ],
     },
     {
