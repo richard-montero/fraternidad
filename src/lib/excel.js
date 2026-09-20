@@ -73,6 +73,7 @@ export function descargarPlantillaImportacion() {
         { celular: "71234567", tipo: "Patrimonial", fecha: "2024-03-10", monto: 1000, concepto: "Pago patrimonial", observaciones: "" },
         { celular: "71234567", tipo: "Obligación mensual", fecha: "2024-02-01", monto: 50, concepto: "Mensualidad febrero 2024", observaciones: "" },
         { celular: "71234567", tipo: "Mensual", fecha: "2024-02-05", monto: 50, concepto: "Pago mensualidad febrero 2024", observaciones: "" },
+        { celular: "71234567", tipo: "Voluntario", fecha: "2024-04-20", monto: 200, concepto: "Aporte voluntario pro-fiesta", observaciones: "Entregado en efectivo" },
       ],
     },
     {
