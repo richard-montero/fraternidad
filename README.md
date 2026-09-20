@@ -247,6 +247,72 @@ este software, pero consérvala).
    meses abreviados (Ene…Dic) como valores posibles. Es opcional: puede
    quedar sin asignar.
 
+### Paso 10: Ejecutar el script del nombre editable (nuevo)
+1. Vuelve a **SQL Editor** → **New query**.
+2. Abre `supabase/06_nombre_fraternidad.sql`, copia todo su contenido y
+   pégalo.
+3. Presiona **Run**. Agrega una tabla de ajustes generales para que el
+   título "Fraternidad" del menú y de la pantalla de ingreso pueda
+   cambiarse desde Configuración anual (solo súper administrador).
+
+### Paso 11: Ejecutar el script de credenciales temporales (nuevo)
+1. Vuelve a **SQL Editor** → **New query**.
+2. Abre `supabase/07_primer_ingreso.sql`, copia todo su contenido y
+   pégalo.
+3. Presiona **Run**.
+4. Ve a **Authentication → Providers → Email** y desactiva **"Secure
+   email change"** (junto a "Confirm email", que ya desactivaste antes).
+
+---
+
+## 🆕 Credenciales temporales y primer ingreso
+
+Ya no hace falta conocer el correo real de cada socio para registrarlo.
+
+**Al crear un socio** (manual o por Excel), si dejas el correo vacío:
+- Se genera automáticamente un correo temporal a partir de su celular:
+  `<celular>@temporal.fraternidad`.
+- Si tampoco conoces su celular real, puedes inventar un número
+  correlativo único (ej. `70000001`, `70000002`, `70000003`…) — solo
+  tiene que no repetirse. El correo temporal saldría entonces
+  `70000001@temporal.fraternidad`.
+- Ese socio queda marcado como "Primer ingreso pendiente" (se ve en la
+  tabla de Socios).
+
+**Lo que le compartes al socio:** su correo temporal + la contraseña
+(por defecto `123456`, salvo que hayas puesto otra al crearlo) y el
+enlace de la aplicación.
+
+**En su primer ingreso:**
+1. Entra con el correo temporal y la contraseña que le diste.
+2. Antes de poder usar el resto del sistema, una pantalla obligatoria le
+   pide su **correo real** y una **contraseña nueva** (definida por él).
+3. La contraseña queda activa al instante.
+4. El correo queda pendiente de confirmación: Supabase le envía un
+   enlace a su correo real. Mientras no lo confirme, sigue pudiendo usar
+   el sistema con normalidad (con la contraseña ya nueva) — el enlace
+   solo termina de "mudar" su acceso a ese correo real.
+
+No se necesita ningún servidor adicional para esto: todo corre con las
+reglas de seguridad de la base de datos (cada socio solo puede tocar su
+propio correo, nunca su rol, estado u otros datos).
+
+---
+
+## 🆕 Correcciones al menú lateral
+
+**1. El menú no se podía usar en el celular** — se corrigió un problema
+de superposición (z-index): el fondo oscuro que aparece detrás del menú
+desplegable tenía prioridad de dibujo más alta que el menú mismo, así que
+cualquier toque terminaba interactuando con ese fondo invisible (que solo
+cierra el menú) en vez de con la opción tocada. En pantallas grandes no
+pasaba porque ahí el menú está siempre fijo, sin ese fondo superpuesto.
+
+**2. Nombre de la fraternidad editable** — en **Configuración anual**
+(solo súper administrador) hay ahora una sección "Nombre de la
+fraternidad": lo que se escriba ahí reemplaza el texto "Fraternidad" en
+el menú lateral y en la pantalla de ingreso, para todos los usuarios.
+
 ---
 
 ## PARTE 2 — Publicar la aplicación en Netlify
@@ -314,7 +380,11 @@ tocar el código.
    agrega índices).
 5.c. Ejecutar `supabase/04_cambios.sql` (fecha de nacimiento, nuevos
    estados de socio, rol Supervisor, ingresos institucionales).
-5.d. Ejecutar `supabase/05_turno.sql` (nuevo — campo Turno del socio).
+5.d. Ejecutar `supabase/05_turno.sql` (campo Turno del socio).
+5.e. Ejecutar `supabase/06_nombre_fraternidad.sql` (nombre editable).
+5.f. Ejecutar `supabase/07_primer_ingreso.sql` (nuevo — credenciales
+   temporales) y desactivar "Secure email change" en Authentication →
+   Providers → Email.
 
 **En Netlify:**
 6. Pegar esas dos claves como variables de entorno (o en un archivo `.env`

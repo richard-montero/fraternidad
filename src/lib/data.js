@@ -11,6 +11,21 @@ function generarCodigoSocio() {
   return "S-" + Math.random().toString(36).slice(2, 10).toUpperCase();
 }
 
+// ---------- Ajustes generales (nombre de la fraternidad, etc.) ----------
+// Lectura pública (funciona incluso antes de iniciar sesión, para que la
+// pantalla de ingreso muestre el nombre correcto); escritura solo para el
+// súper administrador (ver supabase/06_nombre_fraternidad.sql).
+export async function obtenerAjuste(clave, valorPorDefecto) {
+  const { data, error } = await supabase.from("ajustes_generales").select("valor").eq("clave", clave).maybeSingle();
+  if (error || !data) return valorPorDefecto;
+  return data.valor;
+}
+
+export async function guardarAjuste(clave, valor) {
+  const { error } = await supabase.from("ajustes_generales").upsert({ clave, valor: valor.trim() }, { onConflict: "clave" });
+  if (error) throw error;
+}
+
 // ---------- Sesión ----------
 export async function iniciarSesion(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -59,27 +74,58 @@ export async function listarSocios() {
   return data;
 }
 
+// Genera un correo temporal a partir del celular (real o un número
+// inventado, ej. 70000001), para socios de los que aún no se conoce su
+// correo real.
+export function correoTemporalDesdeCelular(celular) {
+  return `${celular.trim().replace(/\s+/g, "")}@temporal.fraternidad`;
+}
+
 export async function crearSocio({ nombre, celular, email, fechaNacimiento, turno, rol = "socio", estado = "patrimonial", password }) {
+  const celularLimpio = celular.trim();
+  const correoReal = email?.trim();
+  const usaCorreoTemporal = !correoReal;
+  const correoFinal = correoReal || correoTemporalDesdeCelular(celularLimpio);
+
   const passwordFinal = password && password.trim().length >= 6 ? password.trim() : "123456";
-  const authUserId = await crearUsuarioDeAcceso(email.trim(), passwordFinal);
+  const authUserId = await crearUsuarioDeAcceso(correoFinal, passwordFinal);
 
   const { data, error } = await supabase
     .from("socios")
     .insert({
       auth_user_id: authUserId,
       nombre: nombre.trim(),
-      celular: celular.trim(),
-      email: email.trim(),
+      celular: celularLimpio,
+      email: correoFinal,
       fecha_nacimiento: fechaNacimiento || null,
       turno: turno || null,
       codigo: generarCodigoSocio(),
       estado,
       rol,
+      requiere_configuracion_inicial: usaCorreoTemporal,
     })
     .select()
     .single();
   if (error) throw error;
   return data;
+}
+
+// Primer ingreso con credenciales temporales: el propio socio define su
+// correo real y su nueva contraseña. La contraseña queda activa de
+// inmediato; el correo queda pendiente de confirmación (Supabase envía
+// un enlace a esa dirección) — ver supabase/07_primer_ingreso.sql.
+export async function completarConfiguracionInicial(socioId, { nuevoCorreo, nuevaPassword }) {
+  const { error: errPass } = await supabase.auth.updateUser({ password: nuevaPassword });
+  if (errPass) throw errPass;
+
+  const { error: errEmail } = await supabase.auth.updateUser({ email: nuevoCorreo.trim() });
+  if (errEmail) throw errEmail;
+
+  const { error: errSocio } = await supabase
+    .from("socios")
+    .update({ email: nuevoCorreo.trim(), requiere_configuracion_inicial: false })
+    .eq("id", socioId);
+  if (errSocio) throw errSocio;
 }
 
 // Cambiar el estado (Patrimonial / Invitado / De baja) — la base de

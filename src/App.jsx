@@ -146,6 +146,7 @@ function useConfirmar() {
 export default function App() {
   const [sesion, setSesion] = useState(null);
   const [cargandoSesion, setCargandoSesion] = useState(true);
+  const [nombreFraternidad, setNombreFraternidad] = useState("Fraternidad");
 
   const [vista, setVista] = useState("dashboard");
   const [socioSeleccionado, setSocioSeleccionado] = useState(null);
@@ -159,11 +160,19 @@ export default function App() {
       .catch(() => setSesion(null))
       .finally(() => setCargandoSesion(false));
 
+    // Se pide incluso antes de iniciar sesión, para que la pantalla de
+    // ingreso ya muestre el nombre que haya definido el súper administrador.
+    api.obtenerAjuste("nombre_fraternidad", "Fraternidad").then(setNombreFraternidad);
+
     const { data: sub } = supabase.auth.onAuthStateChange((evento) => {
       if (evento === "SIGNED_OUT") setSesion(null);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    document.title = `${nombreFraternidad} — Gestión financiera`;
+  }, [nombreFraternidad]);
 
   const ctxData = useAppData(sesion);
 
@@ -172,7 +181,18 @@ export default function App() {
   }
 
   if (!sesion) {
-    return <Login onIngresar={(socio) => { setSesion(socio); setVista("dashboard"); }} />;
+    return <Login onIngresar={(socio) => { setSesion(socio); setVista("dashboard"); }} nombreFraternidad={nombreFraternidad} />;
+  }
+
+  if (sesion.requiere_configuracion_inicial) {
+    return (
+      <ConfigurarCuentaInicial
+        socioId={sesion.id}
+        nombreFraternidad={nombreFraternidad}
+        onListo={(datos) => setSesion((s) => ({ ...s, ...datos }))}
+        onSalir={async () => { await api.cerrarSesion(); setSesion(null); }}
+      />
+    );
   }
 
   if (ctxData.cargando) {
@@ -194,7 +214,7 @@ export default function App() {
     setMenuAbierto(false);
   }
 
-  const ctx = { sesion, confirmar, ...ctxData };
+  const ctx = { sesion, confirmar, nombreFraternidad, setNombreFraternidad, ...ctxData };
   const verAdmin = puedeVer(sesion.rol);
   const NAV_ADMIN = [
     { id: "dashboard", label: "Panel general", icon: LayoutDashboard },
@@ -213,7 +233,7 @@ export default function App() {
       <ToastHost />
       {ConfirmUI}
 
-      <Sidebar sesion={sesion} vista={vista} items={items} irA={irA} onSalir={cerrarSesion} abierto={menuAbierto} cerrar={() => setMenuAbierto(false)} />
+      <Sidebar sesion={sesion} vista={vista} items={items} irA={irA} onSalir={cerrarSesion} abierto={menuAbierto} cerrar={() => setMenuAbierto(false)} nombreFraternidad={nombreFraternidad} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="md:hidden no-print flex items-center justify-between px-4 py-3 sticky top-0" style={{ background: "var(--ink)", color: "#fff", zIndex: 30 }}>
@@ -260,7 +280,7 @@ function PantallaCarga({ texto, esError }) {
 // =====================================================================
 // LOGIN
 // =====================================================================
-function Login({ onIngresar }) {
+function Login({ onIngresar, nombreFraternidad }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [verPassword, setVerPassword] = useState(false);
@@ -296,10 +316,10 @@ function Login({ onIngresar }) {
             className="flex items-center justify-center flex-shrink-0"
             style={{ width: 40, height: 40, borderRadius: 8, background: "var(--ink)", color: "var(--gold)", fontFamily: "var(--font-display)", fontSize: "1.2rem", fontWeight: 700 }}
           >
-            F
+            {(nombreFraternidad || "F").trim().charAt(0).toUpperCase()}
           </div>
           <div>
-            <h1 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", fontSize: "1.35rem", margin: 0, lineHeight: 1.1 }}>Fraternidad</h1>
+            <h1 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", fontSize: "1.35rem", margin: 0, lineHeight: 1.1 }}>{nombreFraternidad}</h1>
             <p style={{ color: "var(--text-muted)", fontSize: "0.82rem", margin: 0 }}>Gestión financiera</p>
           </div>
         </div>
@@ -343,14 +363,116 @@ function Login({ onIngresar }) {
 }
 
 // =====================================================================
+// PRIMER INGRESO — el socio con credenciales temporales define su
+// correo real y su nueva contraseña antes de poder usar el resto de la app.
+// =====================================================================
+function ConfigurarCuentaInicial({ socioId, nombreFraternidad, onListo, onSalir }) {
+  const [correo, setCorreo] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmarPassword, setConfirmarPassword] = useState("");
+  const [verPassword, setVerPassword] = useState(false);
+  const [error, setError] = useState(null);
+  const [exito, setExito] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    if (!correo.trim() || !correo.includes("@")) { setError("Ingresa un correo válido."); return; }
+    if (password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); return; }
+    if (password !== confirmarPassword) { setError("Las dos contraseñas no coinciden."); return; }
+
+    setGuardando(true);
+    try {
+      await api.completarConfiguracionInicial(socioId, { nuevoCorreo: correo, nuevaPassword: password });
+      setExito(
+        `Tu contraseña ya quedó activa. Te enviamos un enlace de confirmación a ${correo.trim()} — ábrelo para terminar de activar tu acceso con ese correo. Mientras tanto, puedes seguir usando el sistema con normalidad.`
+      );
+      onListo({ email: correo.trim(), requiere_configuracion_inicial: false });
+    } catch (err) {
+      setError(err.message || "No se pudo guardar tus datos. Intenta nuevamente.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center px-5"
+      style={{ background: "radial-gradient(circle at 20% 15%, #1d3f30 0%, var(--ink) 45%, #0e2118 100%)", fontFamily: "var(--font-body)" }}
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="w-full"
+        style={{ maxWidth: 420, background: "var(--paper-card)", border: "1px solid var(--line)", borderRadius: 10, padding: "36px 30px", boxShadow: "0 20px 60px rgba(0,0,0,.35)" }}
+      >
+        <h1 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", fontSize: "1.3rem", margin: "0 0 4px" }}>Configura tu cuenta</h1>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", margin: "0 0 20px" }}>
+          Ingresaste con un correo y una contraseña temporales que te dio {nombreFraternidad}. Antes de continuar,
+          define tu correo real y una contraseña propia.
+        </p>
+
+        {error && <Mensaje tipo="error">{error}</Mensaje>}
+        {exito && <Mensaje tipo="exito">{exito}</Mensaje>}
+
+        {!exito ? (
+          <>
+            <div className="flex flex-col gap-3.5 mb-5">
+              <Field label="Tu correo real">
+                <input className="field-input" type="email" required value={correo} onChange={(e) => setCorreo(e.target.value)} autoFocus />
+              </Field>
+              <Field label="Nueva contraseña (mínimo 6 caracteres)">
+                <div className="relative">
+                  <input
+                    className="field-input"
+                    style={{ paddingRight: 40 }}
+                    type={verPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVerPassword((v) => !v)}
+                    className="absolute"
+                    style={{ right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}
+                    aria-label={verPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {verPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
+              </Field>
+              <Field label="Confirmar nueva contraseña">
+                <input className="field-input" type={verPassword ? "text" : "password"} required value={confirmarPassword} onChange={(e) => setConfirmarPassword(e.target.value)} />
+              </Field>
+            </div>
+            <button type="submit" className="btn btn-primary w-full justify-center" disabled={guardando}>
+              {guardando ? "Guardando…" : "Guardar y continuar"}
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn btn-primary w-full justify-center" onClick={() => window.location.reload()}>
+            Entendido, continuar
+          </button>
+        )}
+
+        <button type="button" onClick={onSalir} className="w-full mt-3" style={{ background: "none", border: "none", color: "var(--text-muted)", fontSize: "0.82rem", cursor: "pointer" }}>
+          Cerrar sesión
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// =====================================================================
 // SIDEBAR (fija en escritorio, cajón deslizante en móvil)
 // =====================================================================
-function Sidebar({ sesion, vista, items, irA, onSalir, abierto, cerrar }) {
+function Sidebar({ sesion, vista, items, irA, onSalir, abierto, cerrar, nombreFraternidad }) {
   const contenido = (
     <div className="flex flex-col gap-6 h-full" style={{ width: "var(--sidebar-w)", background: "var(--ink)", color: "#e2ece5", padding: "24px 16px" }}>
       <div className="flex items-center justify-between">
         <div style={{ fontFamily: "var(--font-display)", fontSize: "1.15rem", color: "#fff" }}>
-          Fraternidad
+          {nombreFraternidad}
           <small style={{ display: "block", fontFamily: "var(--font-body)", fontSize: "0.72rem", color: "#8fa89a", fontWeight: 500, marginTop: 4 }}>
             Gestión financiera
           </small>
@@ -389,7 +511,10 @@ function Sidebar({ sesion, vista, items, irA, onSalir, abierto, cerrar }) {
       {abierto && (
         <div className="md:hidden fixed inset-0 no-print" style={{ zIndex: 50 }}>
           <div className="drawer-backdrop absolute inset-0" onClick={cerrar} />
-          <div className="absolute inset-y-0 left-0" style={{ animation: "slideIn 200ms ease" }}>
+          {/* z-index explícito y mayor al del fondo (z-index: 40 en .drawer-backdrop):
+              sin esto, el fondo invisible quedaba pintado ENCIMA del menú y absorbía
+              todos los toques, por eso no se podía seleccionar ninguna opción. */}
+          <div className="absolute inset-y-0 left-0" style={{ animation: "slideIn 200ms ease", zIndex: 45 }}>
             {contenido}
           </div>
         </div>
@@ -749,7 +874,6 @@ function Socios({ ctx, irAFicha }) {
     e.preventDefault();
     setError(null);
     if (!celular.trim()) { setError("El número de celular es obligatorio."); return; }
-    if (!email.trim()) { setError("El correo electrónico es obligatorio: es lo que el socio usará para ingresar."); return; }
     if (ctx.socios.some((s) => s.celular === celular.trim())) {
       setError("Ya existe un socio registrado con ese número de celular.");
       return;
@@ -848,7 +972,20 @@ function Socios({ ctx, irAFicha }) {
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
             <Field label="Nombre completo"><input className="field-input" required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
             <Field label="Número de celular"><input className="field-input" required value={celular} onChange={(e) => setCelular(e.target.value)} /></Field>
-            <Field label="Correo electrónico (será su usuario para ingresar)"><input className="field-input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+            <div>
+              <Field label="Correo electrónico (opcional — déjalo vacío si no lo conoces)">
+                <input className="field-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </Field>
+              {!email.trim() ? (
+                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "4px 0 0" }}>
+                  {celular.trim()
+                    ? <>Se creará un correo temporal: <b className="monto">{api.correoTemporalDesdeCelular(celular)}</b>. En su primer ingreso, el socio define su correo real y su contraseña.</>
+                    : "Sin correo ni celular, no se puede generar un correo temporal — completa al menos el celular."}
+                </p>
+              ) : (
+                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "4px 0 0" }}>Este será su correo de acceso desde ya (no pasará por la pantalla de primer ingreso).</p>
+              )}
+            </div>
             <Field label="Fecha de nacimiento"><input className="field-input" type="date" value={fechaNac} onChange={(e) => setFechaNac(e.target.value)} /></Field>
             <Field label="Turno">
               <select className="field-input" value={turnoNuevo} onChange={(e) => setTurnoNuevo(e.target.value)}>
@@ -901,7 +1038,12 @@ function Socios({ ctx, irAFicha }) {
                 {visibles.map((s) => (
                   <Fragment key={s.id}>
                     <tr>
-                      <td>{s.nombre}</td>
+                      <td>
+                        <span className="flex items-center gap-1.5 flex-wrap">
+                          {s.nombre}
+                          {s.requiere_configuracion_inicial && <Badge tono="dorado">Primer ingreso pendiente</Badge>}
+                        </span>
+                      </td>
                       <td>{s.celular}</td>
                       <td>{s.codigo}</td>
                       <td><Badge tono={tonoEstado(s.estado)}>{etiquetaEstado(s.estado)}</Badge></td>
@@ -2172,6 +2314,12 @@ function ReporteEstadoResultado({ ctx }) {
 // CONFIGURACIÓN ANUAL
 // =====================================================================
 function Configuracion({ ctx }) {
+  const esSuperadmin = ctx.sesion.rol === "superadmin";
+
+  const [nombreEdit, setNombreEdit] = useState(ctx.nombreFraternidad || "");
+  const [msgNombre, setMsgNombre] = useState(null);
+  const [guardandoNombre, setGuardandoNombre] = useState(false);
+
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [cuota, setCuota] = useState("");
   const [msg, setMsg] = useState(null);
@@ -2180,6 +2328,23 @@ function Configuracion({ ctx }) {
   const [mesGen, setMesGen] = useState(new Date().getMonth() + 1);
   const [msgGen, setMsgGen] = useState(null);
   const [generando, setGenerando] = useState(false);
+
+  async function guardarNombre(e) {
+    e.preventDefault();
+    const valor = nombreEdit.trim();
+    if (!valor) { setMsgNombre({ tipo: "error", texto: "El nombre no puede quedar vacío." }); return; }
+    setGuardandoNombre(true);
+    try {
+      await api.guardarAjuste("nombre_fraternidad", valor);
+      ctx.setNombreFraternidad(valor);
+      setMsgNombre({ tipo: "exito", texto: "Nombre actualizado correctamente." });
+      aviso.exito("Nombre de la fraternidad actualizado.");
+    } catch (err) {
+      setMsgNombre({ tipo: "error", texto: err.message || "No se pudo guardar el nombre." });
+    } finally {
+      setGuardandoNombre(false);
+    }
+  }
 
   async function guardarCuota(e) {
     e.preventDefault();
@@ -2212,6 +2377,20 @@ function Configuracion({ ctx }) {
   return (
     <div>
       <PageHeader title="Configuración anual" subtitle="Define la cuota mensual de cada año. Los valores anteriores quedan preservados como historial." />
+
+      {esSuperadmin && (
+        <Card style={{ marginBottom: 20 }}>
+          <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Nombre de la fraternidad</h3>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+            Se usa en el menú lateral y en la pantalla de ingreso. Solo el súper administrador puede cambiarlo.
+          </p>
+          {msgNombre && <Mensaje tipo={msgNombre.tipo}>{msgNombre.texto}</Mensaje>}
+          <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+            <Field label="Nombre"><input className="field-input" required value={nombreEdit} onChange={(e) => setNombreEdit(e.target.value)} /></Field>
+          </div>
+          <div className="mt-4"><Btn onClick={guardarNombre} disabled={guardandoNombre}>{guardandoNombre ? "Guardando…" : "Guardar nombre"}</Btn></div>
+        </Card>
+      )}
 
       <Card style={{ marginBottom: 20 }}>
         <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Definir cuota mensual del año</h3>
@@ -2314,7 +2493,10 @@ function ImportadorExcel({ ctx }) {
       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
         Sube un Excel con hasta 4 hojas — <b>Socios</b>, <b>Aportes</b>, <b>Ingresos institucionales</b> y{" "}
         <b>Gastos</b> — para cargar varios registros de una sola vez. Los socios se identifican por su
-        celular: si el celular ya existe, esa fila se omite (no se duplica). En Aportes, usa el tipo{" "}
+        celular: si el celular ya existe, esa fila se omite (no se duplica). Si no conoces el correo de
+        un socio, deja esa columna vacía (puedes hasta inventar el celular, ej. 70000001, 70000002…) —
+        se le genera un correo temporal y él mismo define su correo real y su contraseña en su primer
+        ingreso. En Aportes, usa el tipo{" "}
         <b>"Obligación mensual"</b> para cargar lo que se le cargó al socio ese mes (Debe), y{" "}
         <b>"Mensual"</b> para el pago que hizo (Haber) — son dos cosas distintas. Los ingresos que no
         vienen de un socio (alquiler, donaciones, otros) van en su propia hoja. La hoja "Instrucciones"
@@ -2353,6 +2535,7 @@ function ImportadorExcel({ ctx }) {
         <div className="mt-5">
           <div className="grid gap-3.5 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
             <StatCard label="Socios creados" value={resultado.sociosCreados} tono="positivo" />
+            <StatCard label="Con correo temporal (pendientes)" value={resultado.sociosConCorreoTemporal} />
             <StatCard label="Socios ya existentes (omitidos)" value={resultado.sociosExistentes} />
             <StatCard label="Obligaciones mensuales generadas" value={resultado.obligacionesMensualesGeneradas} tono="positivo" />
             <StatCard label="Aportes (pagos) registrados" value={resultado.aportesCreados} tono="positivo" />

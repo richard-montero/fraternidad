@@ -73,7 +73,7 @@ function esperar(ms) {
  * - onProgreso(hechos, total): callback opcional para una barra de avance.
  */
 export async function importarDatos({ libro, socios, esSuperadmin, estados, roles, turnos, categoriasGasto, onProgreso }) {
-  const resultado = { sociosCreados: 0, sociosExistentes: 0, obligacionesCreadas: 0, obligacionesMensualesGeneradas: 0, aportesCreados: 0, ingresosExternosCreados: 0, gastosCreados: 0, errores: [] };
+  const resultado = { sociosCreados: 0, sociosConCorreoTemporal: 0, sociosExistentes: 0, obligacionesCreadas: 0, obligacionesMensualesGeneradas: 0, aportesCreados: 0, ingresosExternosCreados: 0, gastosCreados: 0, errores: [] };
 
   const mapaCelular = new Map();
   socios.forEach((s) => mapaCelular.set(normalizar(s.celular), s.id));
@@ -94,8 +94,8 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
     const celular = String(campo(fila, "Celular", "Numero de celular")).trim();
     const email = String(campo(fila, "Correo electronico", "Correo", "Email")).trim();
 
-    if (!celular || !email) {
-      resultado.errores.push(`Socios, fila ${i + 2}: falta el celular o el correo — se omitió esta fila.`);
+    if (!celular) {
+      resultado.errores.push(`Socios, fila ${i + 2}: falta el celular — se omitió esta fila.`);
       avanzar();
       continue;
     }
@@ -126,6 +126,7 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
       });
       mapaCelular.set(claveCel, socio.id);
       resultado.sociosCreados++;
+      if (!email) resultado.sociosConCorreoTemporal++;
       if (aporteAcordado > 0) {
         await api.crearObligacionPatrimonial(socio.id, aporteAcordado, hoyISO());
         resultado.obligacionesCreadas++;
