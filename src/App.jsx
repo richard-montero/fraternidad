@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useState, Fragment, cloneElemen
 import {
   LayoutDashboard, Users, ArrowDownCircle, ArrowUpCircle, BarChart3,
   Settings, LogOut, Plus, X, ChevronRight, ChevronUp, ChevronDown, Paperclip, Check,
-  Menu, Eye, EyeOff, Trash2, Download, Printer, Pencil, AlertCircle,
+  Menu, Eye, EyeOff, Trash2, Download, Printer, Pencil, AlertCircle, QrCode,
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient.js";
 import * as api from "./lib/data.js";
@@ -219,12 +219,16 @@ export default function App() {
   const NAV_ADMIN = [
     { id: "dashboard", label: "Panel general", icon: LayoutDashboard },
     { id: "socios", label: "Socios", icon: Users },
+    { id: "pagar_qr", label: "Pagar con QR", icon: QrCode },
     { id: "ingresos", label: "Libro de ingresos", icon: ArrowDownCircle },
     { id: "gastos", label: "Libro de gastos", icon: ArrowUpCircle },
     { id: "reportes", label: "Reportes", icon: BarChart3 },
     ...(puedeEditar(sesion.rol) ? [{ id: "configuracion", label: "Configuración anual", icon: Settings }] : []),
   ];
-  const NAV_SOCIO = [{ id: "dashboard", label: "Mi resumen", icon: LayoutDashboard }];
+  const NAV_SOCIO = [
+    { id: "dashboard", label: "Mi resumen", icon: LayoutDashboard },
+    { id: "pagar_qr", label: "Pagar con QR", icon: QrCode },
+  ];
   const items = verAdmin ? NAV_ADMIN : NAV_SOCIO;
   const tituloVista = items.find((i) => i.id === vista)?.label || "Ficha de socio";
 
@@ -246,6 +250,7 @@ export default function App() {
 
         <main className="flex-1 w-full px-4 py-6 sm:px-8 sm:py-10" style={{ maxWidth: 1180 }}>
           {vista === "dashboard" && <Dashboard ctx={ctx} irASocio={(id) => { setSocioSeleccionado(id); setVista("ficha"); }} />}
+          {vista === "pagar_qr" && <PagarQR ctx={ctx} />}
           {vista === "socios" && verAdmin && (
             <Socios ctx={ctx} irAFicha={(id) => { setSocioSeleccionado(id); setVista("ficha"); }} />
           )}
@@ -770,8 +775,7 @@ function DashboardAdmin({ ctx }) {
   const totalIngPeriodo = porTipo.patrimonial + porTipo.mensual + porTipo.voluntario + totalExternoPeriodo;
   const totalGastoPeriodo = gastosPeriodo.reduce((a, b) => a + Number(b.monto), 0);
   const saldoPeriodo = totalIngPeriodo - totalGastoPeriodo;
-  const saldoAcumulado = ctx.totalIngresos - ctx.totalGastos;
-
+  const saldoCaja = ctx.totalIngresos - ctx.totalGastos;
   const enBaja = ctx.socios.filter((s) => s.estado === "de_baja").length;
   const patrimoniales = ctx.socios.filter((s) => s.estado === "patrimonial").length;
   const invitados = ctx.socios.filter((s) => s.estado === "invitado").length;
@@ -781,14 +785,20 @@ function DashboardAdmin({ ctx }) {
 
   return (
     <div>
-      <PageHeader title="Panel general" subtitle={`Resumen financiero de la fraternidad — ${periodo.etiqueta}`} />
+      <PageHeader title="Panel general" subtitle="Resumen financiero de la fraternidad" />
+
+      <Card style={{ marginBottom: 20, background: "var(--ink)", border: "none" }}>
+        <div style={{ fontSize: "0.8rem", color: "#c7d4cc", fontWeight: 500 }}>Saldo caja (no depende del período — es todo el histórico)</div>
+        <div className="monto" style={{ fontFamily: "var(--font-display)", fontSize: "2rem", color: saldoCaja >= 0 ? "#8fe0b6" : "#f3a9a9", marginTop: 4 }}>{bs(saldoCaja)}</div>
+      </Card>
+
+      <PageHeader title={`Detalle — ${periodo.etiqueta}`} subtitle="Filtra por mes, año o rango de fechas." />
       <Render />
 
       <div className="grid gap-3.5 mb-6" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
         <StatCard label="Ingresos del período" value={bs(totalIngPeriodo)} tono="positivo" />
         <StatCard label="Egresos del período" value={bs(totalGastoPeriodo)} tono="negativo" />
         <StatCard label="Saldo del período" value={bs(saldoPeriodo)} tono={saldoPeriodo >= 0 ? "positivo" : "negativo"} />
-        <StatCard label="Saldo acumulado histórico" value={bs(saldoAcumulado)} tono={saldoAcumulado >= 0 ? "positivo" : "negativo"} />
       </div>
 
       <Card style={{ marginBottom: 16 }}>
@@ -830,6 +840,91 @@ function DashboardSocio({ ctx, irASocio }) {
         </p>
       </Card>
     </div>
+  );
+}
+
+// =====================================================================
+// PAGAR CON QR — visible para todos los socios
+// =====================================================================
+function PagarQR({ ctx }) {
+  const [tab, setTab] = useState("alquiler");
+
+  return (
+    <div>
+      <PageHeader title="Pagar con QR" subtitle="Escanea el código correspondiente desde tu app bancaria para realizar tu pago." />
+
+      <div className="flex gap-1 mb-5" style={{ borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
+        {[["alquiler", "Alquiler / Uso fraternidad"], ["patrimonial", "Patrimonial"]].map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            style={{
+              background: "none", border: "none", padding: "10px 16px", fontWeight: 600, fontSize: "0.88rem", whiteSpace: "nowrap",
+              color: tab === id ? "var(--ink)" : "var(--text-muted)", cursor: "pointer",
+              borderBottom: tab === id ? "2px solid var(--gold)" : "2px solid transparent", marginBottom: -1,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <ImagenQR ctx={ctx} tipo={tab} />
+    </div>
+  );
+}
+
+function ImagenQR({ ctx, tipo }) {
+  const [url, setUrl] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [descargando, setDescargando] = useState(false);
+
+  useEffect(() => {
+    setCargando(true); setError(null); setUrl(null);
+    ctx.obtenerUrlImagenQR(tipo)
+      .then(setUrl)
+      .catch((e) => setError(e.message || "No se pudo cargar la imagen."))
+      .finally(() => setCargando(false));
+  }, [tipo]);
+
+  async function descargar() {
+    setDescargando(true);
+    try {
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `QR_${tipo}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      aviso.error("No se pudo descargar la imagen.");
+    } finally {
+      setDescargando(false);
+    }
+  }
+
+  return (
+    <Card style={{ textAlign: "center" }}>
+      {cargando ? (
+        <div className="skeleton" style={{ height: 260, maxWidth: 260, margin: "0 auto", borderRadius: 8 }} />
+      ) : error ? (
+        <Mensaje tipo="error">{error}</Mensaje>
+      ) : !url ? (
+        <Vacio>Todavía no se subió esta imagen. Un administrador puede hacerlo desde Configuración anual → Pagos con QR.</Vacio>
+      ) : (
+        <>
+          <img src={url} alt="Código QR" style={{ maxWidth: 280, width: "100%", borderRadius: 8, border: "1px solid var(--line)" }} />
+          <div className="mt-4">
+            <Btn icon={Download} onClick={descargar} disabled={descargando}>{descargando ? "Descargando…" : "Descargar imagen"}</Btn>
+          </div>
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -2488,7 +2583,7 @@ function Configuracion({ ctx }) {
     const c = Number(cuota);
     if (!c || c <= 0) { setMsg({ tipo: "error", texto: "Ingresa una cuota mensual válida." }); return; }
     await ctx.guardarCuotaAnual(anio, c);
-    setMsg({ tipo: "exito", texto: `Cuota mensual de ${anio} guardada correctamente.` });
+    setMsg({ tipo: "exito", texto: `Nueva cuota mensual de ${anio} guardada — será la que se use de ahora en adelante para ese año.` });
     aviso.exito("Cuota anual guardada.");
     setCuota("");
   }
@@ -2531,6 +2626,11 @@ function Configuracion({ ctx }) {
 
       <Card style={{ marginBottom: 20 }}>
         <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Definir cuota mensual del año</h3>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+          Un mismo año puede tener varias cuotas a lo largo del tiempo (por ejemplo, si sube a mitad de
+          año) — siempre se usa la última que guardes para ese año, sin borrar las anteriores del
+          historial.
+        </p>
         {msg && <Mensaje tipo={msg.tipo}>{msg.texto}</Mensaje>}
         <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
           <Field label="Año"><input className="field-input" type="number" required value={anio} onChange={(e) => setAnio(Number(e.target.value))} /></Field>
@@ -2560,17 +2660,94 @@ function Configuracion({ ctx }) {
         <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Historial de cuotas por año</h3>
         {ctx.configAnual.length === 0 ? <Vacio>Aún no se definió ninguna cuota.</Vacio> : (
           <table className="ledger">
-            <thead><tr><th>Año</th><th className="num">Cuota mensual</th></tr></thead>
+            <thead><tr><th>Año</th><th className="num">Cuota mensual</th><th>Definida el</th><th></th></tr></thead>
             <tbody>
-              {ctx.configAnual.slice().sort((a, b) => b.anio - a.anio).map((c) => (
-                <tr key={c.anio}><td>{c.anio}</td><td className="num monto">{bs(c.cuota)}</td></tr>
-              ))}
+              {ctx.configAnual
+                .slice()
+                .sort((a, b) => b.anio - a.anio || new Date(b.creado_en) - new Date(a.creado_en))
+                .map((c, i, arr) => {
+                  const vigente = arr.findIndex((x) => x.anio === c.anio) === i;
+                  return (
+                    <tr key={c.id}>
+                      <td>{c.anio}</td>
+                      <td className="num monto">{bs(c.cuota)}</td>
+                      <td>{c.creado_en ? fdate(c.creado_en.slice(0, 10)) : "—"}</td>
+                      <td>{vigente && <Badge tono="verde">Vigente</Badge>}</td>
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         )}
       </Card>
 
+      <PagosQR ctx={ctx} />
+
       <ImportadorExcel ctx={ctx} />
+    </div>
+  );
+}
+
+// =====================================================================
+// PAGOS CON QR — subida (Configuración anual)
+// =====================================================================
+function PagosQR({ ctx }) {
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Pagos con QR</h3>
+      <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+        Sube las imágenes de los códigos QR que verán todos los socios en "Pagar con QR". Puedes
+        reemplazarlas cuando quieras — la nueva imagen sustituye a la anterior de inmediato.
+      </p>
+      <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        <SubidaQR ctx={ctx} tipo="alquiler" titulo="QR Alquiler / Uso fraternidad" />
+        <SubidaQR ctx={ctx} tipo="patrimonial" titulo="QR Patrimonial" />
+      </div>
+    </Card>
+  );
+}
+
+function SubidaQR({ ctx, tipo, titulo }) {
+  const [url, setUrl] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [subiendo, setSubiendo] = useState(false);
+  const [error, setError] = useState(null);
+
+  function cargar() {
+    setCargando(true);
+    ctx.obtenerUrlImagenQR(tipo).then(setUrl).catch(() => setUrl(null)).finally(() => setCargando(false));
+  }
+  useEffect(cargar, [tipo]);
+
+  async function subir(e) {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    setSubiendo(true);
+    setError(null);
+    try {
+      await ctx.guardarImagenQR(tipo, archivo);
+      aviso.exito(`${titulo} actualizado.`);
+      cargar();
+    } catch (err) {
+      setError(err.message || "No se pudo subir la imagen.");
+    } finally {
+      setSubiendo(false);
+      e.target.value = "";
+    }
+  }
+
+  return (
+    <div style={{ border: "1px solid var(--line)", borderRadius: 8, padding: 14 }}>
+      <div style={{ fontWeight: 600, marginBottom: 10, fontSize: "0.9rem" }}>{titulo}</div>
+      {error && <Mensaje tipo="error">{error}</Mensaje>}
+      {cargando ? (
+        <div className="skeleton" style={{ height: 120, borderRadius: 6, marginBottom: 10 }} />
+      ) : url ? (
+        <img src={url} alt={titulo} style={{ maxWidth: 160, display: "block", marginBottom: 10, borderRadius: 6, border: "1px solid var(--line)" }} />
+      ) : (
+        <p style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>Todavía no se subió ninguna imagen.</p>
+      )}
+      <input className="field-input" type="file" accept="image/*" onChange={subir} disabled={subiendo} />
     </div>
   );
 }

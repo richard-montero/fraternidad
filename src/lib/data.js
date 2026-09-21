@@ -207,11 +207,15 @@ export async function enviarRestablecimientoPassword(email) {
 
 // ---------- Configuración anual ----------
 export async function listarConfigAnual() {
-  return seleccionarTodo("config_anual", { orderBy: "anio", ascending: false });
+  return seleccionarTodo("config_anual", { orderBy: "creado_en", ascending: false });
 }
 
+// Ahora cada llamada agrega una fila nueva (no reemplaza la anterior): un
+// mismo año puede tener varias cuotas a lo largo del tiempo, y como
+// listarConfigAnual() ordena de más nueva a más vieja, la primera que se
+// encuentra para un año es siempre la vigente.
 export async function guardarCuotaAnual(anio, cuota) {
-  const { error } = await supabase.from("config_anual").upsert({ anio, cuota }, { onConflict: "anio" });
+  const { error } = await supabase.from("config_anual").insert({ anio, cuota });
   if (error) throw error;
 }
 
@@ -433,6 +437,30 @@ export async function eliminarGasto(gastoId) {
 
 export async function obtenerUrlComprobante(ruta) {
   const { data, error } = await supabase.storage.from(BUCKET_COMPROBANTES).createSignedUrl(ruta, 60 * 10);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+// ---------- Pagos con QR ----------
+// Las imágenes se guardan en el bucket privado "qr-pagos" (hay que
+// crearlo a mano en Storage, igual que "comprobantes-gastos"); la ruta
+// de cada una se guarda en ajustes_generales bajo una clave fija por
+// tipo, para poder encontrarla y mostrarla después.
+const BUCKET_QR = "qr-pagos";
+const CLAVE_QR = { alquiler: "qr_alquiler_ruta", patrimonial: "qr_patrimonial_ruta" };
+
+export async function guardarImagenQR(tipo, archivo) {
+  const ext = (archivo.name.split(".").pop() || "png").toLowerCase();
+  const ruta = `${tipo}.${ext}`;
+  const { error: errSubida } = await supabase.storage.from(BUCKET_QR).upload(ruta, archivo, { upsert: true });
+  if (errSubida) throw errSubida;
+  await guardarAjuste(CLAVE_QR[tipo], ruta);
+}
+
+export async function obtenerUrlImagenQR(tipo) {
+  const ruta = await obtenerAjuste(CLAVE_QR[tipo], null);
+  if (!ruta) return null;
+  const { data, error } = await supabase.storage.from(BUCKET_QR).createSignedUrl(ruta, 60 * 10);
   if (error) throw error;
   return data.signedUrl;
 }

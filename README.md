@@ -271,6 +271,41 @@ este software, pero consérvala).
    para cargar las obligaciones mensuales de forma más confiable (ver
    más abajo).
 
+### Paso 13: Ejecutar el script de Saldo caja y Pagos con QR (nuevo)
+1. Vuelve a **SQL Editor** → **New query**.
+2. Abre `supabase/09_saldo_caja_qr.sql`, copia todo su contenido y
+   pégalo.
+3. Presiona **Run**.
+4. Ve a **Storage** → **New bucket**. Nombre exacto: `qr-pagos`. Déjalo
+   **privado** (igual que `comprobantes-gastos`). Presiona **Save**.
+
+---
+
+## 🆕 Saldo caja, Pagos con QR, e historial de cuotas por año
+
+**Saldo caja (Panel general):** una tarjeta destacada, separada de los
+filtros de período, con el total de todos los ingresos menos todos los
+egresos desde siempre — no cambia según el mes/año/rango que elijas
+consultar.
+
+**Pagos con QR:** nueva opción de menú (entre Socios y Libro de
+ingresos), visible para **todos los socios**, con dos pestañas —
+"Alquiler / Uso fraternidad" y "Patrimonial" — cada una muestra el
+código QR correspondiente con un botón para descargarlo. Un
+administrador o súper administrador sube o reemplaza esas dos imágenes
+desde **Configuración anual → Pagos con QR**.
+
+**Historial de cuotas por año:** ahora un mismo año puede tener varias
+cuotas guardadas a lo largo del tiempo (por ejemplo, si sube a mitad de
+año) — no se pierden las anteriores, y tanto "Generar mensualidades"
+como el resto de la aplicación siempre usan la **última** que se guardó
+para ese año. La tabla de historial marca con una etiqueta "Vigente"
+cuál es la que está en uso para cada año.
+
+La fecha de las mensualidades generadas por el botón "Generar
+mensualidades" ya quedaba fijada al día 1 de cada mes — no hizo falta
+ningún cambio ahí.
+
 ---
 
 ## 🆕 Corrección: un bloque que fallaba abandonaba el resto silenciosamente
@@ -507,8 +542,11 @@ tocar el código.
 5.f. Ejecutar `supabase/07_primer_ingreso.sql` (credenciales temporales)
    y desactivar "Secure email change" en Authentication → Providers →
    Email.
-5.g. Ejecutar `supabase/08_importacion_robusta.sql` (nuevo — importación
-   de Excel más confiable).
+5.g. Ejecutar `supabase/08_importacion_robusta.sql` (importación de
+   Excel más confiable).
+5.h. Ejecutar `supabase/09_saldo_caja_qr.sql` (nuevo — historial de
+   cuotas y Pagos con QR) y crear el bucket privado `qr-pagos` en
+   Storage.
 
 **En Netlify:**
 6. Pegar esas dos claves como variables de entorno (o en un archivo `.env`

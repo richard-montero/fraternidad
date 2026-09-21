@@ -119,6 +119,8 @@ export function useAppData(sesion) {
     editarGasto: (id, gasto) => accion(() => api.editarGasto(id, gasto)),
     eliminarGasto: (id) => accion(() => api.eliminarGasto(id)),
     obtenerUrlComprobante: (ruta) => api.obtenerUrlComprobante(ruta),
+    guardarImagenQR: (tipo, archivo) => accion(() => api.guardarImagenQR(tipo, archivo)),
+    obtenerUrlImagenQR: (tipo) => api.obtenerUrlImagenQR(tipo),
     registrarIngresoExterno: (datos) => accion(() => api.registrarIngresoExterno(datos)),
     editarIngresoExterno: (id, datos) => accion(() => api.editarIngresoExterno(id, datos)),
     eliminarIngresoExterno: (id) => accion(() => api.eliminarIngresoExterno(id)),
