@@ -11,6 +11,29 @@ function generarCodigoSocio() {
   return "S-" + Math.random().toString(36).slice(2, 10).toUpperCase();
 }
 
+// Supabase nunca devuelve más de 1000 filas en una sola consulta (es el
+// límite por defecto de la API), sin avisar que recortó el resultado.
+// Esta función pide "todo" en páginas de 1000 hasta juntarlo completo —
+// hace falta un orden estable (orderBy) para que la paginación no
+// repita ni salte filas entre una página y la siguiente.
+async function seleccionarTodo(tabla, { orderBy, ascending = true, filtros } = {}) {
+  const TAM_PAGINA = 1000;
+  let desde = 0;
+  const todo = [];
+  for (;;) {
+    let query = supabase.from(tabla).select("*");
+    if (filtros) query = filtros(query);
+    if (orderBy) query = query.order(orderBy, { ascending });
+    query = query.range(desde, desde + TAM_PAGINA - 1);
+    const { data, error } = await query;
+    if (error) throw error;
+    todo.push(...data);
+    if (!data || data.length < TAM_PAGINA) break;
+    desde += TAM_PAGINA;
+  }
+  return todo;
+}
+
 // ---------- Ajustes generales (nombre de la fraternidad, etc.) ----------
 // Lectura pública (funciona incluso antes de iniciar sesión, para que la
 // pantalla de ingreso muestre el nombre correcto); escritura solo para el
@@ -69,9 +92,7 @@ async function obtenerSocioPorAuthId(authUserId) {
 
 // ---------- Socios ----------
 export async function listarSocios() {
-  const { data, error } = await supabase.from("socios").select("*").order("nombre");
-  if (error) throw error;
-  return data;
+  return seleccionarTodo("socios", { orderBy: "nombre" });
 }
 
 // Genera un correo temporal a partir del celular (real o un número
@@ -186,9 +207,7 @@ export async function enviarRestablecimientoPassword(email) {
 
 // ---------- Configuración anual ----------
 export async function listarConfigAnual() {
-  const { data, error } = await supabase.from("config_anual").select("*").order("anio", { ascending: false });
-  if (error) throw error;
-  return data;
+  return seleccionarTodo("config_anual", { orderBy: "anio", ascending: false });
 }
 
 export async function guardarCuotaAnual(anio, cuota) {
@@ -198,8 +217,7 @@ export async function guardarCuotaAnual(anio, cuota) {
 
 // ---------- Obligaciones patrimoniales ----------
 export async function listarObligacionesPatrimoniales() {
-  const { data, error } = await supabase.from("obligaciones_patrimoniales").select("*");
-  if (error) throw error;
+  const data = await seleccionarTodo("obligaciones_patrimoniales", { orderBy: "socio_id" });
   const mapa = {};
   data.forEach((o) => { mapa[o.socio_id] = Number(o.monto); });
   return mapa;
@@ -233,8 +251,7 @@ async function registrarMovimiento(tabla, socioId, fecha, concepto, debe, haber)
 }
 
 export async function listarMovimientos(tabla) {
-  const { data, error } = await supabase.from(tabla).select("*").order("fecha", { ascending: true });
-  if (error) throw error;
+  const data = await seleccionarTodo(tabla, { orderBy: "fecha", ascending: true });
   const mapa = {};
   data.forEach((m) => {
     if (!mapa[m.socio_id]) mapa[m.socio_id] = [];
@@ -285,9 +302,7 @@ export async function registrarAjuste(tabla, socioId, monto, fecha, concepto, ti
 
 // ---------- Mensualidades generadas ----------
 export async function listarObligacionesMensualesGeneradas() {
-  const { data, error } = await supabase.from("obligaciones_mensuales_generadas").select("*");
-  if (error) throw error;
-  return data;
+  return seleccionarTodo("obligaciones_mensuales_generadas", { orderBy: "socio_id" });
 }
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
@@ -329,9 +344,7 @@ export async function generarMensualidades(anio, mes, socios, configAnual) {
 
 // ---------- Aportes voluntarios ----------
 export async function listarAportesVoluntarios() {
-  const { data, error } = await supabase.from("aportes_voluntarios").select("*").order("fecha", { ascending: false });
-  if (error) throw error;
-  return data;
+  return seleccionarTodo("aportes_voluntarios", { orderBy: "fecha", ascending: false });
 }
 
 export async function registrarAporteVoluntario(socioId, monto, fecha, concepto, observaciones) {
@@ -343,9 +356,7 @@ export async function registrarAporteVoluntario(socioId, monto, fecha, concepto,
 
 // ---------- Ingresos que no provienen de socios ----------
 export async function listarIngresosExternos() {
-  const { data, error } = await supabase.from("ingresos_externos").select("*").order("fecha", { ascending: false });
-  if (error) throw error;
-  return data;
+  return seleccionarTodo("ingresos_externos", { orderBy: "fecha", ascending: false });
 }
 
 export async function registrarIngresoExterno({ fecha, tipo, concepto, origen, monto, observaciones }) {
@@ -374,9 +385,7 @@ export async function eliminarIngresoExterno(id) {
 const BUCKET_COMPROBANTES = "comprobantes-gastos";
 
 export async function listarGastos() {
-  const { data, error } = await supabase.from("gastos").select("*").order("fecha", { ascending: false });
-  if (error) throw error;
-  return data;
+  return seleccionarTodo("gastos", { orderBy: "fecha", ascending: false });
 }
 
 export async function registrarGasto(gasto, archivo) {

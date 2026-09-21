@@ -296,6 +296,40 @@ alto.
 
 ---
 
+## 🆕 Corrección importante: los datos no faltaban, se estaban leyendo incompletos
+
+Esta es la causa real de que las obligaciones y pagos mensuales
+parecieran incompletos, y probablemente **tus datos ya estaban bien
+guardados** — el problema era de lectura, no de importación.
+
+**La causa:** Supabase nunca devuelve más de 1000 filas en una sola
+consulta (es un límite de seguridad por defecto de su API), sin avisar
+que recortó el resultado. La aplicación pedía "todos los movimientos
+mensuales" en una sola consulta — con más de 1000 filas en total entre
+todos los socios (en tu caso, cerca de 4.370: 3999 obligaciones + 371
+pagos), Supabase silenciosamente devolvía solo las primeras 1000,
+ordenadas por fecha — es decir, únicamente las más antiguas. Por eso el
+corte caía siempre en la misma fecha, sin importar qué corrigiera en la
+importación: el dato faltante nunca fue un problema de guardado, sino
+de lectura.
+
+Las demás tablas (gastos, ingresos institucionales, aportes
+patrimoniales, aportes voluntarios) se veían completas porque, en tu
+caso, cada una tiene menos de 1000 filas — nunca llegaron a tropezar con
+el límite.
+
+**La corrección:** toda consulta que pide "todo" ahora pide los datos en
+páginas de 1000 y las junta, así nunca queda nada afuera sin importar
+cuántas filas haya. No hace falta ningún script SQL — es puramente un
+cambio de cómo la aplicación lee los datos.
+
+Si después de desplegar esto todavía faltara algo, **ahí sí** sería una
+señal de que realmente no se terminó de guardar en la importación (y no
+un problema de lectura) — pero antes de volver a importar nada, primero
+actualiza el código y revisa si ya aparece todo.
+
+---
+
 ## 🆕 Credenciales temporales y primer ingreso
 
 Ya no hace falta conocer el correo real de cada socio para registrarlo.
