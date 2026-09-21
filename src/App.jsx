@@ -774,6 +774,9 @@ function DashboardAdmin({ ctx }) {
   const totalExternoPeriodo = externosPeriodo.reduce((a, b) => a + Number(b.monto), 0);
   const totalIngPeriodo = porTipo.patrimonial + porTipo.mensual + porTipo.voluntario + totalExternoPeriodo;
   const totalGastoPeriodo = gastosPeriodo.reduce((a, b) => a + Number(b.monto), 0);
+  const porCategoria = Object.fromEntries(CATEGORIAS_GASTO.map((c) => [c.value, 0]));
+  gastosPeriodo.forEach((g) => { porCategoria[g.categoria] = (porCategoria[g.categoria] || 0) + Number(g.monto); });
+  const maxCategoria = Math.max(...Object.values(porCategoria), 1);
   const saldoPeriodo = totalIngPeriodo - totalGastoPeriodo;
   const saldoCaja = ctx.totalIngresos - ctx.totalGastos;
   const enBaja = ctx.socios.filter((s) => s.estado === "de_baja").length;
@@ -807,6 +810,15 @@ function DashboardAdmin({ ctx }) {
         <Barra label="Aportes mensuales" valor={porTipo.mensual} max={maxOrigen} color="var(--gold)" />
         <Barra label="Aportes voluntarios" valor={porTipo.voluntario} max={maxOrigen} color="var(--ink-soft)" />
         <Barra label="Otros ingresos (alquiler, donaciones...)" valor={totalExternoPeriodo} max={maxOrigen} color="#2b5a7a" />
+      </Card>
+
+      <Card style={{ marginBottom: 16 }}>
+        <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Egresos por origen</h3>
+        {totalGastoPeriodo === 0 ? <Vacio>No hay egresos en este período.</Vacio> : (
+          CATEGORIAS_GASTO.map((c) => (
+            <Barra key={c.value} label={c.label} valor={porCategoria[c.value] || 0} max={maxCategoria} color="var(--rust)" />
+          ))
+        )}
       </Card>
 
       <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
