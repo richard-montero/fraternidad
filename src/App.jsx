@@ -1245,6 +1245,12 @@ function FichaGeneral({ ctx, socio }) {
   const pagadoM = sumar(movM, "haber");
   const saldoM = generadoM - pagadoM;
 
+  const aportesVol = ctx.aportesVoluntarios
+    .filter((a) => a.socio_id === socio.id)
+    .slice()
+    .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
+  const totalVol = sumar(aportesVol, "monto");
+
   return (
     <div>
       <Card style={{ marginBottom: 16 }}>
@@ -1271,7 +1277,7 @@ function FichaGeneral({ ctx, socio }) {
           </div>
         )}
       </Card>
-      <Card>
+      <Card style={{ marginBottom: 16 }}>
         <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>2 · Aportes mensuales</h3>
         <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
           <StatCard label="Total generado" value={bs(generadoM)} />
@@ -1279,8 +1285,35 @@ function FichaGeneral({ ctx, socio }) {
           <StatCard label="Saldo pendiente" value={bs(saldoM)} tono={saldoM > 0 ? "negativo" : "positivo"} />
         </div>
       </Card>
+      <Card>
+        <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>3 · Aportes voluntarios</h3>
+        <div className="grid gap-3.5 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+          <StatCard label="Total aportado" value={bs(totalVol)} tono="positivo" />
+          <StatCard label="Cantidad de aportes" value={aportesVol.length} />
+        </div>
+        {aportesVol.length === 0 ? (
+          <Vacio>Este socio aún no registró aportes voluntarios.</Vacio>
+        ) : (
+          <div className="ledger-wrap">
+            <table className="ledger">
+              <thead><tr><th>Fecha</th><th>Concepto</th><th>Observaciones</th><th className="num">Monto</th></tr></thead>
+              <tbody>
+                {aportesVol.map((a) => (
+                  <tr key={a.id}>
+                    <td>{fdate(a.fecha)}</td>
+                    <td>{a.concepto}</td>
+                    <td>{a.observaciones || "—"}</td>
+                    <td className="num monto">{bs(a.monto)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr><td colSpan={3}>Total</td><td className="num monto">{bs(totalVol)}</td></tr></tfoot>
+            </table>
+          </div>
+        )}
+      </Card>
       <p style={{ marginTop: 16, color: "var(--text-muted)", fontSize: "0.85rem" }}>
-        Estas son dos cuentas independientes: el saldo patrimonial y el saldo mensual nunca se mezclan entre sí.
+        Estas son cuentas independientes: el saldo patrimonial, el saldo mensual y los aportes voluntarios nunca se mezclan entre sí.
       </p>
     </div>
   );
