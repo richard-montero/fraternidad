@@ -257,7 +257,7 @@ export async function registrarPagoMensual(socioId, monto, fecha, concepto) {
 export async function crearObligacionMensualHistorica(socioId, anio, mes, monto, concepto) {
   const { data: existente, error: errCheck } = await supabase
     .from("obligaciones_mensuales_generadas")
-    .select("id")
+    .select("socio_id")
     .eq("socio_id", socioId).eq("anio", anio).eq("mes", mes)
     .maybeSingle();
   if (errCheck) throw errCheck;
