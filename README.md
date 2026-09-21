@@ -263,6 +263,37 @@ este software, pero consérvala).
 4. Ve a **Authentication → Providers → Email** y desactiva **"Secure
    email change"** (junto a "Confirm email", que ya desactivaste antes).
 
+### Paso 12: Ejecutar el script de importación robusta (nuevo)
+1. Vuelve a **SQL Editor** → **New query**.
+2. Abre `supabase/08_importacion_robusta.sql`, copia todo su contenido y
+   pégalo.
+3. Presiona **Run**. Agrega una función que la importación de Excel usa
+   para cargar las obligaciones mensuales de forma más confiable (ver
+   más abajo).
+
+---
+
+## 🆕 Corrección: un bloque que fallaba abandonaba el resto silenciosamente
+
+El arreglo anterior (escribir en bloques) hizo la importación mucho más
+rápida, pero tenía una falla: si UN bloque de 500 filas fallaba por
+cualquier motivo, el código completo se detenía ahí — los bloques
+siguientes nunca se llegaban a intentar, y en pantalla solo quedaba un
+mensaje de error genérico entre docenas de otros, fácil de pasar por
+alto.
+
+**La corrección:**
+- Un bloque que falla **ya no detiene a los demás** — cada bloque se
+  intenta de forma independiente, y al final ves exactamente cuántas
+  filas entraron y cuántas no, con el motivo.
+- Las obligaciones mensuales ahora se cargan con una función dentro de
+  la propia base de datos (`importar_obligaciones_mensuales`, instalada
+  por `08_importacion_robusta.sql`) que inserta la obligación y su
+  movimiento correspondiente **en una sola operación**, y descarta las
+  que ya existían usando la propia base de datos en vez de consultarlo
+  primero desde el navegador — más rápido y sin los límites de tamaño de
+  consulta que podían fallar con archivos grandes.
+
 ---
 
 ## 🆕 Credenciales temporales y primer ingreso
@@ -439,9 +470,11 @@ tocar el código.
    estados de socio, rol Supervisor, ingresos institucionales).
 5.d. Ejecutar `supabase/05_turno.sql` (campo Turno del socio).
 5.e. Ejecutar `supabase/06_nombre_fraternidad.sql` (nombre editable).
-5.f. Ejecutar `supabase/07_primer_ingreso.sql` (nuevo — credenciales
-   temporales) y desactivar "Secure email change" en Authentication →
-   Providers → Email.
+5.f. Ejecutar `supabase/07_primer_ingreso.sql` (credenciales temporales)
+   y desactivar "Secure email change" en Authentication → Providers →
+   Email.
+5.g. Ejecutar `supabase/08_importacion_robusta.sql` (nuevo — importación
+   de Excel más confiable).
 
 **En Netlify:**
 6. Pegar esas dos claves como variables de entorno (o en un archivo `.env`

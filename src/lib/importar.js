@@ -147,26 +147,20 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
 
   avanzarPaso(`Creando ${candidatosSocio.length} socios…`);
   if (candidatosSocio.length > 0) {
-    try {
-      const creados = await crearSociosEnLote(candidatosSocio);
-      creados.forEach((s) => mapaCelular.set(normalizar(s.celular), s.id));
-      resultado.sociosCreados = creados.length;
-      resultado.sociosSinAcceso = creados.length;
-    } catch (err) {
-      resultado.errores.push(`Socios: no se pudo crear el lote — ${err.message}`);
-    }
+    const r = await crearSociosEnLote(candidatosSocio);
+    r.creados.forEach((s) => mapaCelular.set(normalizar(s.celular), s.id));
+    resultado.sociosCreados = r.creados.length;
+    resultado.sociosSinAcceso = r.creados.length;
+    resultado.errores.push(...r.errores.map((e) => `Socios: ${e}`));
   }
 
   if (aportesAcordados.length > 0) {
     const entradas = aportesAcordados
       .map((a) => ({ socioId: mapaCelular.get(a.celular), monto: a.monto, fecha: hoyISO() }))
       .filter((e) => e.socioId);
-    try {
-      await sumarObligacionesPatrimonialesEnLote(entradas);
-      resultado.obligacionesCreadas = entradas.length;
-    } catch (err) {
-      resultado.errores.push(`Socios: no se pudo registrar el aporte patrimonial acordado — ${err.message}`);
-    }
+    const r = await sumarObligacionesPatrimonialesEnLote(entradas);
+    resultado.obligacionesCreadas = entradas.length;
+    resultado.errores.push(...r.errores.map((e) => `Aporte patrimonial acordado: ${e}`));
   }
 
   // =====================================================================
@@ -208,35 +202,29 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
   });
 
   avanzarPaso(`Registrando ${pagosPatrimoniales.length + pagosMensuales.length} pagos…`);
-  try {
-    if (pagosPatrimoniales.length > 0) await registrarMovimientosEnLote("movimientos_patrimoniales", pagosPatrimoniales);
-    if (pagosMensuales.length > 0) await registrarMovimientosEnLote("movimientos_mensuales", pagosMensuales);
-    resultado.aportesCreados += pagosPatrimoniales.length + pagosMensuales.length;
-  } catch (err) {
-    resultado.errores.push(`Aportes (pagos): no se pudo escribir el lote — ${err.message}`);
+  if (pagosPatrimoniales.length > 0) {
+    const r = await registrarMovimientosEnLote("movimientos_patrimoniales", pagosPatrimoniales);
+    resultado.aportesCreados += r.insertadas;
+    resultado.errores.push(...r.errores.map((e) => `Aportes (pagos patrimoniales): ${e}`));
+  }
+  if (pagosMensuales.length > 0) {
+    const r = await registrarMovimientosEnLote("movimientos_mensuales", pagosMensuales);
+    resultado.aportesCreados += r.insertadas;
+    resultado.errores.push(...r.errores.map((e) => `Aportes (pagos mensuales): ${e}`));
   }
 
   if (voluntarios.length > 0) {
-    try {
-      await registrarAportesVoluntariosEnLote(voluntarios);
-      resultado.aportesCreados += voluntarios.length;
-    } catch (err) {
-      resultado.errores.push(`Aportes voluntarios: no se pudo escribir el lote — ${err.message}`);
-    }
+    const r = await registrarAportesVoluntariosEnLote(voluntarios);
+    resultado.aportesCreados += r.insertadas;
+    resultado.errores.push(...r.errores.map((e) => `Aportes voluntarios: ${e}`));
   }
 
   avanzarPaso(`Registrando ${obligacionesMensuales.length} obligaciones mensuales…`);
   if (obligacionesMensuales.length > 0) {
-    try {
-      const r = await crearObligacionesMensualesEnLote(obligacionesMensuales);
-      resultado.obligacionesMensualesGeneradas = r.creadas;
-      resultado.obligacionesMensualesYaExistian = r.yaExistian;
-      if (r.yaExistian > 0) {
-        resultado.errores.push(`Obligaciones mensuales: ${r.yaExistian} fila(s) se omitieron porque ese socio ya tenía esa obligación de ese mes generada (no se duplican).`);
-      }
-    } catch (err) {
-      resultado.errores.push(`Obligaciones mensuales: no se pudo escribir el lote — ${err.message}`);
-    }
+    const r = await crearObligacionesMensualesEnLote(obligacionesMensuales);
+    resultado.obligacionesMensualesGeneradas = r.creadas;
+    resultado.obligacionesMensualesYaExistian = r.yaExistian;
+    resultado.errores.push(...r.errores.map((e) => `Obligaciones mensuales: ${e}`));
   }
 
   // =====================================================================
@@ -266,12 +254,9 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
 
   avanzarPaso(`Registrando ${ingresosExternos.length} ingresos institucionales…`);
   if (ingresosExternos.length > 0) {
-    try {
-      await registrarIngresosExternosEnLote(ingresosExternos);
-      resultado.ingresosExternosCreados = ingresosExternos.length;
-    } catch (err) {
-      resultado.errores.push(`Ingresos institucionales: no se pudo escribir el lote — ${err.message}`);
-    }
+    const r = await registrarIngresosExternosEnLote(ingresosExternos);
+    resultado.ingresosExternosCreados = r.insertadas;
+    resultado.errores.push(...r.errores.map((e) => `Ingresos institucionales: ${e}`));
   }
 
   // =====================================================================
@@ -295,12 +280,9 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
 
   avanzarPaso(`Registrando ${gastos.length} gastos…`);
   if (gastos.length > 0) {
-    try {
-      await registrarGastosEnLote(gastos);
-      resultado.gastosCreados = gastos.length;
-    } catch (err) {
-      resultado.errores.push(`Gastos: no se pudo escribir el lote — ${err.message}`);
-    }
+    const r = await registrarGastosEnLote(gastos);
+    resultado.gastosCreados = r.insertadas;
+    resultado.errores.push(...r.errores.map((e) => `Gastos: ${e}`));
   }
 
   return resultado;
