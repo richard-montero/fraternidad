@@ -1211,7 +1211,7 @@ function FichaSocio({ ctx, socioId, volver }) {
       </div>
 
       <div className="flex gap-1 mb-5 no-print" style={{ borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
-        {[["general", "Resumen general"], ["patrimonial", "Aporte patrimonial"], ["mensual", "Aportes mensuales"]].map(([id, label]) => (
+        {[["general", "Resumen general"], ["patrimonial", "Aporte patrimonial"], ["mensual", "Aportes mensuales"], ["voluntario", "Aportes voluntarios"]].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -1229,6 +1229,7 @@ function FichaSocio({ ctx, socioId, volver }) {
       {tab === "general" && <FichaGeneral ctx={ctx} socio={socio} />}
       {tab === "patrimonial" && <FichaPatrimonial ctx={ctx} socio={socio} esAdmin={editable} />}
       {tab === "mensual" && <FichaMensual ctx={ctx} socio={socio} esAdmin={editable} />}
+      {tab === "voluntario" && <FichaVoluntario ctx={ctx} socio={socio} esAdmin={editable} />}
     </div>
   );
 }
@@ -1287,30 +1288,10 @@ function FichaGeneral({ ctx, socio }) {
       </Card>
       <Card>
         <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>3 · Aportes voluntarios</h3>
-        <div className="grid gap-3.5 mb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
+        <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
           <StatCard label="Total aportado" value={bs(totalVol)} tono="positivo" />
           <StatCard label="Cantidad de aportes" value={aportesVol.length} />
         </div>
-        {aportesVol.length === 0 ? (
-          <Vacio>Este socio aún no registró aportes voluntarios.</Vacio>
-        ) : (
-          <div className="ledger-wrap">
-            <table className="ledger">
-              <thead><tr><th>Fecha</th><th>Concepto</th><th>Observaciones</th><th className="num">Monto</th></tr></thead>
-              <tbody>
-                {aportesVol.map((a) => (
-                  <tr key={a.id}>
-                    <td>{fdate(a.fecha)}</td>
-                    <td>{a.concepto}</td>
-                    <td>{a.observaciones || "—"}</td>
-                    <td className="num monto">{bs(a.monto)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot><tr><td colSpan={3}>Total</td><td className="num monto">{bs(totalVol)}</td></tr></tfoot>
-            </table>
-          </div>
-        )}
       </Card>
       <p style={{ marginTop: 16, color: "var(--text-muted)", fontSize: "0.85rem" }}>
         Estas son cuentas independientes: el saldo patrimonial, el saldo mensual y los aportes voluntarios nunca se mezclan entre sí.
@@ -1487,6 +1468,91 @@ function FichaMensual({ ctx, socio, esAdmin }) {
         {movs.length === 0 ? (
           <Vacio>Aún no hay mensualidades generadas para este socio. Genéralas desde «Configuración anual».</Vacio>
         ) : <LedgerConSaldo movimientos={movs} />}
+      </Card>
+    </div>
+  );
+}
+
+function FichaVoluntario({ ctx, socio, esAdmin }) {
+  const aportes = useMemo(() => (
+    ctx.aportesVoluntarios
+      .filter((a) => a.socio_id === socio.id)
+      .slice()
+      .sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
+  ), [ctx.aportesVoluntarios, socio.id]);
+  const total = sumar(aportes, "monto");
+
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [monto, setMonto] = useState("");
+  const [fecha, setFecha] = useState(hoyISO());
+  const [concepto, setConcepto] = useState("Aporte voluntario");
+  const [observaciones, setObservaciones] = useState("");
+  const [error, setError] = useState(null);
+
+  async function guardar(e) {
+    e.preventDefault();
+    setError(null);
+    const m = Number(monto);
+    if (!m || m <= 0) { setError("Ingresa un monto válido, mayor a cero."); return; }
+    await ctx.registrarAporteVoluntario(socio.id, m, fecha, concepto, observaciones);
+    aviso.exito("Aporte voluntario registrado correctamente.");
+    setMonto(""); setObservaciones(""); setMostrarForm(false);
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-center gap-3 flex-wrap mb-1">
+        <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", margin: 0 }}>Aportes voluntarios</h3>
+      </div>
+
+      <div className="grid gap-3.5 mb-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+        <StatCard label="Total aportado" value={bs(total)} tono="positivo" />
+        <StatCard label="Cantidad de aportes" value={aportes.length} />
+      </div>
+
+      {esAdmin && (
+        <div className="mb-4">
+          <Btn variante={mostrarForm ? "primary" : "secondary"} onClick={() => setMostrarForm((v) => !v)}>
+            {mostrarForm ? "Cancelar" : "Registrar aporte voluntario"}
+          </Btn>
+          {mostrarForm && (
+            <Card style={{ marginTop: 12 }}>
+              {error && <Mensaje tipo="error">{error}</Mensaje>}
+              <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+                <Field label="Monto (Bs)"><input className="field-input" type="number" min="0" step="0.01" required value={monto} onChange={(e) => setMonto(e.target.value)} /></Field>
+                <Field label="Fecha"><input className="field-input" type="date" required value={fecha} onChange={(e) => setFecha(e.target.value)} /></Field>
+                <Field label="Concepto"><input className="field-input" value={concepto} onChange={(e) => setConcepto(e.target.value)} /></Field>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Field label="Observaciones"><textarea className="field-input" rows={2} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} /></Field>
+                </div>
+              </div>
+              <div className="mt-4"><Btn onClick={guardar}>Registrar aporte</Btn></div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      <Card>
+        {aportes.length === 0 ? (
+          <Vacio>Este socio aún no registró aportes voluntarios.</Vacio>
+        ) : (
+          <div className="ledger-wrap">
+            <table className="ledger">
+              <thead><tr><th>Fecha</th><th>Concepto</th><th>Observaciones</th><th className="num">Monto</th></tr></thead>
+              <tbody>
+                {aportes.map((a) => (
+                  <tr key={a.id}>
+                    <td>{fdate(a.fecha)}</td>
+                    <td>{a.concepto}</td>
+                    <td>{a.observaciones || "—"}</td>
+                    <td className="num monto">{bs(a.monto)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot><tr><td colSpan={3}>Total</td><td className="num monto">{bs(total)}</td></tr></tfoot>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
