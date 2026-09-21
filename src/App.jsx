@@ -2600,7 +2600,7 @@ function ImportadorExcel({ ctx }) {
     if (!ok) return;
 
     setProcesando(true);
-    setProgreso({ hechos: 0, total: 1 });
+    setProgreso({ paso: 0, totalPasos: 8, etiqueta: "Preparando…" });
     try {
       const libro = await leerLibroExcel(archivo);
       const r = await importarDatos({
@@ -2611,7 +2611,7 @@ function ImportadorExcel({ ctx }) {
         roles: ROLES_ACCESO,
         turnos: TURNOS,
         categoriasGasto: CATEGORIAS_GASTO,
-        onProgreso: (hechos, total) => setProgreso({ hechos, total }),
+        onProgreso: (paso, totalPasos, etiqueta) => setProgreso({ paso, totalPasos, etiqueta }),
       });
       setResultado(r);
       if (r.errores.length === 0) aviso.exito("Importación completada sin errores.");
@@ -2629,13 +2629,14 @@ function ImportadorExcel({ ctx }) {
       <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Importar datos desde Excel</h3>
       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
         Sube un Excel con hasta 4 hojas — <b>Socios</b>, <b>Aportes</b>, <b>Ingresos institucionales</b> y{" "}
-        <b>Gastos</b> — para cargar varios registros de una sola vez. Los socios se identifican por su
-        celular: si no conoces el celular real de alguno, puedes inventar un número correlativo único
-        (ej. 70000001, 70000002…). Un socio importado <b>todavía no tiene cuenta de acceso</b> — Supabase
-        limita cuántas cuentas se pueden crear por hora, así que la importación nunca las crea en lote;
-        actívalas de a una desde la tabla de Socios (botón "Activar acceso") cuando cada socio esté listo
-        para usar el sistema. En Aportes, usa el tipo{" "}
-        <b>"Obligación mensual"</b> para cargar lo que se le cargó al socio ese mes (Debe), y{" "}
+        <b>Gastos</b> — para cargar varios registros de una sola vez. Todo se escribe <b>en bloques</b>{" "}
+        (no fila por fila), así que aunque el archivo tenga miles de filas la importación toma segundos,
+        no minutos. Los socios se identifican por su celular: si no conoces el celular real de alguno,
+        puedes inventar un número correlativo único (ej. 70000001, 70000002…). Un socio importado{" "}
+        <b>todavía no tiene cuenta de acceso</b> — Supabase limita cuántas cuentas se pueden crear por
+        hora, así que la importación nunca las crea en lote; actívalas de a una desde la tabla de Socios
+        (botón "Activar acceso") cuando cada socio esté listo para usar el sistema. En Aportes, usa el
+        tipo <b>"Obligación mensual"</b> para cargar lo que se le cargó al socio ese mes (Debe), y{" "}
         <b>"Mensual"</b> para el pago que hizo (Haber) — son dos cosas distintas. Los ingresos que no
         vienen de un socio (alquiler, donaciones, otros) van en su propia hoja. La hoja "Instrucciones"
         de la plantilla explica cada valor permitido.
@@ -2664,8 +2665,8 @@ function ImportadorExcel({ ctx }) {
 
       {procesando && progreso && (
         <div className="mt-4">
-          <div className="barra-track"><div className="barra-fill" style={{ width: `${Math.round((progreso.hechos / Math.max(progreso.total, 1)) * 100)}%`, background: "var(--gold)" }} /></div>
-          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 6 }}>Procesando fila {progreso.hechos} de {progreso.total}…</p>
+          <div className="barra-track"><div className="barra-fill" style={{ width: `${Math.round((progreso.paso / Math.max(progreso.totalPasos, 1)) * 100)}%`, background: "var(--gold)" }} /></div>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 6 }}>{progreso.etiqueta}</p>
         </div>
       )}
 
@@ -2676,6 +2677,7 @@ function ImportadorExcel({ ctx }) {
             <StatCard label="Sin acceso todavía (activar en Socios)" value={resultado.sociosSinAcceso} />
             <StatCard label="Socios ya existentes (omitidos)" value={resultado.sociosExistentes} />
             <StatCard label="Obligaciones mensuales generadas" value={resultado.obligacionesMensualesGeneradas} tono="positivo" />
+            <StatCard label="Obligaciones que ya existían (omitidas)" value={resultado.obligacionesMensualesYaExistian} />
             <StatCard label="Aportes (pagos) registrados" value={resultado.aportesCreados} tono="positivo" />
             <StatCard label="Ingresos institucionales" value={resultado.ingresosExternosCreados} tono="positivo" />
             <StatCard label="Gastos registrados" value={resultado.gastosCreados} tono="positivo" />

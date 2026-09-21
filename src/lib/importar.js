@@ -1,12 +1,24 @@
 import * as XLSX from "xlsx";
-import * as api from "./data.js";
+import {
+  crearSociosEnLote,
+  sumarObligacionesPatrimonialesEnLote,
+  registrarMovimientosEnLote,
+  crearObligacionesMensualesEnLote,
+  registrarAportesVoluntariosEnLote,
+  registrarIngresosExternosEnLote,
+  registrarGastosEnLote,
+} from "./importarLote.js";
 
 // =====================================================================
-// Importación masiva desde un Excel con hasta 3 hojas: "Socios",
-// "Aportes" y "Gastos" (ver descargarPlantillaImportacion en excel.js).
-// Reutiliza exactamente las mismas funciones que usa el resto de la
-// aplicación (crearSocio, registrarPagoPatrimonial, etc.), así que
-// respeta las mismas reglas y permisos que un registro manual.
+// Importación masiva desde un Excel con hasta 4 hojas: "Socios",
+// "Aportes", "Ingresos institucionales" y "Gastos" (ver
+// descargarPlantillaImportacion en excel.js).
+//
+// Primero se valida y arma todo en memoria, y recién al final se escribe
+// en la base de datos EN BLOQUES (unas pocas llamadas de red en vez de
+// una por fila) — así una importación de miles de filas toma segundos,
+// no minutos, y es mucho más difícil que quede a medias por un corte de
+// red o porque el navegador quedó en segundo plano.
 // =====================================================================
 
 export function leerLibroExcel(file) {
@@ -64,12 +76,24 @@ function hoyISO() {
  * - esSuperadmin: si es false, todo socio nuevo se crea como
  *   Patrimonial / Socio, sin importar lo que diga el Excel (misma regla
  *   que en el formulario manual).
- * - estados / roles / categoriasGasto: las listas de la app (ESTADOS_SOCIO,
- *   ROLES_ACCESO, CATEGORIAS_GASTO) para traducir las etiquetas del Excel.
- * - onProgreso(hechos, total): callback opcional para una barra de avance.
+ * - estados / roles / turnos / categoriasGasto: las listas de la app
+ *   (ESTADOS_SOCIO, ROLES_ACCESO, TURNOS, CATEGORIAS_GASTO) para traducir
+ *   las etiquetas del Excel.
+ * - onProgreso(paso, totalPasos, etiqueta): callback opcional para una
+ *   barra de avance — avanza por ETAPA (Socios, Aportes, Ingresos,
+ *   Gastos...), no por fila, porque ahora se escribe todo en bloques.
  */
 export async function importarDatos({ libro, socios, esSuperadmin, estados, roles, turnos, categoriasGasto, onProgreso }) {
-  const resultado = { sociosCreados: 0, sociosSinAcceso: 0, sociosExistentes: 0, obligacionesCreadas: 0, obligacionesMensualesGeneradas: 0, aportesCreados: 0, ingresosExternosCreados: 0, gastosCreados: 0, errores: [] };
+  const resultado = {
+    sociosCreados: 0, sociosSinAcceso: 0, sociosExistentes: 0,
+    obligacionesCreadas: 0, obligacionesMensualesGeneradas: 0, obligacionesMensualesYaExistian: 0,
+    aportesCreados: 0, ingresosExternosCreados: 0, gastosCreados: 0,
+    errores: [],
+  };
+
+  const TOTAL_PASOS = 8;
+  let paso = 0;
+  const avanzarPaso = (etiqueta) => onProgreso?.(++paso, TOTAL_PASOS, etiqueta);
 
   const mapaCelular = new Map();
   socios.forEach((s) => mapaCelular.set(normalizar(s.celular), s.id));
@@ -79,28 +103,29 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
   const filasIngresosExternos = hojaComoFilas(libro, ["Ingresos institucionales", "Ingresos externos", "Otros ingresos"]);
   const filasGastos = hojaComoFilas(libro, ["Gastos"]);
 
-  const total = filasSocios.length + filasAportes.length + filasIngresosExternos.length + filasGastos.length;
-  let hechos = 0;
-  const avanzar = () => { hechos++; onProgreso?.(hechos, total); };
+  // =====================================================================
+  // 1) Socios — validar, armar el lote y crearlos todos de una vez
+  // =====================================================================
+  avanzarPaso("Validando socios…");
+  const candidatosSocio = [];
+  const aportesAcordados = []; // { celular, monto } — se resuelve el socioId después de crearlos
+  const vistosEnArchivo = new Set();
 
-  // ---------- 1) Socios ----------
-  for (let i = 0; i < filasSocios.length; i++) {
-    const fila = filasSocios[i];
+  filasSocios.forEach((fila, i) => {
     const nombre = String(campo(fila, "Nombre completo", "Nombre")).trim();
     const celular = String(campo(fila, "Celular", "Numero de celular")).trim();
     const email = String(campo(fila, "Correo electronico", "Correo", "Email")).trim();
 
     if (!celular) {
       resultado.errores.push(`Socios, fila ${i + 2}: falta el celular — se omitió esta fila.`);
-      avanzar();
-      continue;
+      return;
     }
     const claveCel = normalizar(celular);
-    if (mapaCelular.has(claveCel)) {
+    if (mapaCelular.has(claveCel) || vistosEnArchivo.has(claveCel)) {
       resultado.sociosExistentes++;
-      avanzar();
-      continue;
+      return;
     }
+    vistosEnArchivo.add(claveCel);
 
     const estadoValor = estados.find((e) => normalizar(e.label) === normalizar(campo(fila, "Estado")))?.value || "patrimonial";
     const rolValor = roles.find((r) => normalizar(r.label) === normalizar(campo(fila, "Rol", "Rol de acceso")))?.value || "socio";
@@ -108,33 +133,52 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
     const turnoTxt = String(campo(fila, "Turno")).trim();
     const turnoValor = (turnos || []).find((t) => normalizar(t) === normalizar(turnoTxt)) || null;
 
+    candidatosSocio.push({
+      celular,
+      nombre: nombre || celular,
+      email: email || null,
+      fechaNacimiento: convertirFecha(campo(fila, "Fecha de nacimiento", "Nacimiento")),
+      turno: turnoValor,
+      estado: esSuperadmin ? estadoValor : "patrimonial",
+      rol: esSuperadmin ? rolValor : "socio",
+    });
+    if (aporteAcordado > 0) aportesAcordados.push({ celular: claveCel, monto: aporteAcordado });
+  });
+
+  avanzarPaso(`Creando ${candidatosSocio.length} socios…`);
+  if (candidatosSocio.length > 0) {
     try {
-      const socio = await api.crearSocio({
-        nombre: nombre || celular,
-        celular,
-        email: email || null,
-        fechaNacimiento: convertirFecha(campo(fila, "Fecha de nacimiento", "Nacimiento")),
-        turno: turnoValor,
-        estado: esSuperadmin ? estadoValor : "patrimonial",
-        rol: esSuperadmin ? rolValor : "socio",
-        crearAcceso: false, // la cuenta de acceso se activa después, una por una (ver Socios → Activar acceso)
-      });
-      mapaCelular.set(claveCel, socio.id);
-      resultado.sociosCreados++;
-      resultado.sociosSinAcceso++;
-      if (aporteAcordado > 0) {
-        await api.crearObligacionPatrimonial(socio.id, aporteAcordado, hoyISO());
-        resultado.obligacionesCreadas++;
-      }
+      const creados = await crearSociosEnLote(candidatosSocio);
+      creados.forEach((s) => mapaCelular.set(normalizar(s.celular), s.id));
+      resultado.sociosCreados = creados.length;
+      resultado.sociosSinAcceso = creados.length;
     } catch (err) {
-      resultado.errores.push(`Socios, fila ${i + 2} (${nombre || celular}): ${err.message}`);
+      resultado.errores.push(`Socios: no se pudo crear el lote — ${err.message}`);
     }
-    avanzar();
   }
 
-  // ---------- 2) Aportes ----------
-  for (let i = 0; i < filasAportes.length; i++) {
-    const fila = filasAportes[i];
+  if (aportesAcordados.length > 0) {
+    const entradas = aportesAcordados
+      .map((a) => ({ socioId: mapaCelular.get(a.celular), monto: a.monto, fecha: hoyISO() }))
+      .filter((e) => e.socioId);
+    try {
+      await sumarObligacionesPatrimonialesEnLote(entradas);
+      resultado.obligacionesCreadas = entradas.length;
+    } catch (err) {
+      resultado.errores.push(`Socios: no se pudo registrar el aporte patrimonial acordado — ${err.message}`);
+    }
+  }
+
+  // =====================================================================
+  // 2) Aportes — validar y separar por tipo
+  // =====================================================================
+  avanzarPaso("Validando aportes…");
+  const pagosPatrimoniales = [];
+  const pagosMensuales = [];
+  const voluntarios = [];
+  const obligacionesMensuales = [];
+
+  filasAportes.forEach((fila, i) => {
     const celularOriginal = String(campo(fila, "Celular", "Celular del socio")).trim();
     const socioId = mapaCelular.get(normalizar(celularOriginal));
     const tipoTxt = normalizar(campo(fila, "Tipo"));
@@ -145,76 +189,96 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
 
     if (!socioId) {
       resultado.errores.push(`Aportes, fila ${i + 2}: no se encontró ningún socio con celular "${celularOriginal}".`);
-      avanzar();
-      continue;
+      return;
     }
     if (!monto || monto <= 0) {
       resultado.errores.push(`Aportes, fila ${i + 2}: el monto no es válido.`);
-      avanzar();
-      continue;
+      return;
     }
 
-    try {
-      if (tipoTxt === "patrimonial") await api.registrarPagoPatrimonial(socioId, monto, fecha, concepto);
-      else if (tipoTxt === "mensual") await api.registrarPagoMensual(socioId, monto, fecha, concepto);
-      else if (tipoTxt === "voluntario") await api.registrarAporteVoluntario(socioId, monto, fecha, concepto, observaciones);
-      else if (tipoTxt === "obligacion mensual" || tipoTxt === "cargo mensual" || tipoTxt === "mensualidad generada") {
-        const [anioStr, mesStr] = fecha.split("-");
-        const r = await api.crearObligacionMensualHistorica(socioId, Number(anioStr), Number(mesStr), monto, concepto);
-        if (r.yaExistia) {
-          resultado.errores.push(`Aportes, fila ${i + 2}: ese socio ya tenía una obligación mensual generada para ${mesStr}/${anioStr} — se omitió para no duplicar.`);
-          avanzar();
-          continue;
-        }
-        resultado.obligacionesMensualesGeneradas++;
-        avanzar();
-        continue;
-      } else {
-        resultado.errores.push(`Aportes, fila ${i + 2}: el tipo "${campo(fila, "Tipo")}" no se reconoce (usa Patrimonial, Mensual, Voluntario u Obligación mensual).`);
-        avanzar();
-        continue;
-      }
-      resultado.aportesCreados++;
-    } catch (err) {
-      resultado.errores.push(`Aportes, fila ${i + 2}: ${err.message}`);
+    if (tipoTxt === "patrimonial") pagosPatrimoniales.push({ socio_id: socioId, fecha, concepto, debe: 0, haber: monto });
+    else if (tipoTxt === "mensual") pagosMensuales.push({ socio_id: socioId, fecha, concepto, debe: 0, haber: monto });
+    else if (tipoTxt === "voluntario") voluntarios.push({ socio_id: socioId, fecha, concepto, monto, observaciones });
+    else if (tipoTxt === "obligacion mensual" || tipoTxt === "cargo mensual" || tipoTxt === "mensualidad generada") {
+      const [anioStr, mesStr] = fecha.split("-");
+      obligacionesMensuales.push({ socioId, anio: Number(anioStr), mes: Number(mesStr), monto, concepto, fecha });
+    } else {
+      resultado.errores.push(`Aportes, fila ${i + 2}: el tipo "${campo(fila, "Tipo")}" no se reconoce (usa Patrimonial, Mensual, Voluntario u Obligación mensual).`);
     }
-    avanzar();
+  });
+
+  avanzarPaso(`Registrando ${pagosPatrimoniales.length + pagosMensuales.length} pagos…`);
+  try {
+    if (pagosPatrimoniales.length > 0) await registrarMovimientosEnLote("movimientos_patrimoniales", pagosPatrimoniales);
+    if (pagosMensuales.length > 0) await registrarMovimientosEnLote("movimientos_mensuales", pagosMensuales);
+    resultado.aportesCreados += pagosPatrimoniales.length + pagosMensuales.length;
+  } catch (err) {
+    resultado.errores.push(`Aportes (pagos): no se pudo escribir el lote — ${err.message}`);
   }
 
-  // ---------- 3) Ingresos institucionales (no provienen de un socio) ----------
-  for (let i = 0; i < filasIngresosExternos.length; i++) {
-    const fila = filasIngresosExternos[i];
+  if (voluntarios.length > 0) {
+    try {
+      await registrarAportesVoluntariosEnLote(voluntarios);
+      resultado.aportesCreados += voluntarios.length;
+    } catch (err) {
+      resultado.errores.push(`Aportes voluntarios: no se pudo escribir el lote — ${err.message}`);
+    }
+  }
+
+  avanzarPaso(`Registrando ${obligacionesMensuales.length} obligaciones mensuales…`);
+  if (obligacionesMensuales.length > 0) {
+    try {
+      const r = await crearObligacionesMensualesEnLote(obligacionesMensuales);
+      resultado.obligacionesMensualesGeneradas = r.creadas;
+      resultado.obligacionesMensualesYaExistian = r.yaExistian;
+      if (r.yaExistian > 0) {
+        resultado.errores.push(`Obligaciones mensuales: ${r.yaExistian} fila(s) se omitieron porque ese socio ya tenía esa obligación de ese mes generada (no se duplican).`);
+      }
+    } catch (err) {
+      resultado.errores.push(`Obligaciones mensuales: no se pudo escribir el lote — ${err.message}`);
+    }
+  }
+
+  // =====================================================================
+  // 3) Ingresos institucionales
+  // =====================================================================
+  avanzarPaso("Validando ingresos institucionales…");
+  const ingresosExternos = [];
+  filasIngresosExternos.forEach((fila, i) => {
     const tipoTxt = normalizar(campo(fila, "Tipo"));
     const monto = Number(campo(fila, "Monto"));
     const fecha = convertirFecha(campo(fila, "Fecha")) || hoyISO();
     const concepto = String(campo(fila, "Concepto")).trim();
     const origen = String(campo(fila, "Origen")).trim();
     const observaciones = String(campo(fila, "Observaciones")).trim();
-
     const tipoValor = tipoTxt === "alquiler" ? "alquiler" : tipoTxt === "donacion" ? "donacion" : tipoTxt === "otro" || tipoTxt === "otros" ? "otro" : null;
 
     if (!tipoValor) {
       resultado.errores.push(`Ingresos institucionales, fila ${i + 2}: el tipo "${campo(fila, "Tipo")}" no se reconoce (usa Alquiler, Donación u Otro).`);
-      avanzar();
-      continue;
+      return;
     }
     if (!concepto || !monto || monto <= 0) {
       resultado.errores.push(`Ingresos institucionales, fila ${i + 2}: falta el concepto o el monto no es válido.`);
-      avanzar();
-      continue;
+      return;
     }
+    ingresosExternos.push({ fecha, tipo: tipoValor, concepto, origen: origen || null, monto, observaciones: observaciones || null });
+  });
+
+  avanzarPaso(`Registrando ${ingresosExternos.length} ingresos institucionales…`);
+  if (ingresosExternos.length > 0) {
     try {
-      await api.registrarIngresoExterno({ fecha, tipo: tipoValor, concepto, origen, monto, observaciones });
-      resultado.ingresosExternosCreados++;
+      await registrarIngresosExternosEnLote(ingresosExternos);
+      resultado.ingresosExternosCreados = ingresosExternos.length;
     } catch (err) {
-      resultado.errores.push(`Ingresos institucionales, fila ${i + 2}: ${err.message}`);
+      resultado.errores.push(`Ingresos institucionales: no se pudo escribir el lote — ${err.message}`);
     }
-    avanzar();
   }
 
-  // ---------- 4) Gastos ----------
-  for (let i = 0; i < filasGastos.length; i++) {
-    const fila = filasGastos[i];
+  // =====================================================================
+  // 4) Gastos
+  // =====================================================================
+  const gastos = [];
+  filasGastos.forEach((fila, i) => {
     const categoria = categoriasGasto.find((c) => normalizar(c.label) === normalizar(campo(fila, "Categoria", "Categoría")))?.value || "otros";
     const monto = Number(campo(fila, "Monto"));
     const fecha = convertirFecha(campo(fila, "Fecha")) || hoyISO();
@@ -224,16 +288,19 @@ export async function importarDatos({ libro, socios, esSuperadmin, estados, role
 
     if (!concepto || !monto || monto <= 0) {
       resultado.errores.push(`Gastos, fila ${i + 2}: falta el concepto o el monto no es válido.`);
-      avanzar();
-      continue;
+      return;
     }
+    gastos.push({ fecha, categoria, concepto, beneficiario: beneficiario || null, monto, forma_pago: formaPago || null });
+  });
+
+  avanzarPaso(`Registrando ${gastos.length} gastos…`);
+  if (gastos.length > 0) {
     try {
-      await api.registrarGasto({ fecha, categoria, concepto, beneficiario, monto, formaPago }, null);
-      resultado.gastosCreados++;
+      await registrarGastosEnLote(gastos);
+      resultado.gastosCreados = gastos.length;
     } catch (err) {
-      resultado.errores.push(`Gastos, fila ${i + 2}: ${err.message}`);
+      resultado.errores.push(`Gastos: no se pudo escribir el lote — ${err.message}`);
     }
-    avanzar();
   }
 
   return resultado;

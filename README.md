@@ -332,6 +332,30 @@ vacía, así que solo cambió el código.
 
 ---
 
+## 🆕 Corrección: la importación quedaba a medias en archivos grandes
+
+Si notaste que a algunos socios les faltaban meses o pagos después de
+importar (y esto le pasaba a **todos** los socios, siempre cortado más
+o menos en la misma fecha), tampoco era un error de datos: la
+importación procesaba **una fila a la vez**, cada una con su propia
+llamada a internet. Con un archivo de miles de filas eso podía tardar
+muchos minutos — y si el navegador quedaba en segundo plano, la
+computadora entraba en reposo, o había un corte de red en el medio, el
+proceso se detenía ahí mismo, sin ningún aviso de error, dejando todo lo
+anterior a esa fila cargado y todo lo posterior sin cargar.
+
+**La corrección:** ahora la importación arma todo en memoria primero
+(validando cada fila) y recién al final escribe todo **en bloques** —
+unas pocas llamadas a internet en vez de miles. Una importación que
+antes podía tardar 20-30 minutos ahora toma unos segundos, lo que hace
+prácticamente imposible que quede interrumpida a la mitad.
+
+De paso, esto también resuelve el error "column
+obligaciones_mensuales_generadas.id does not exist" que viste antes —
+esa consulta puntual también se reescribió como parte de este cambio.
+
+---
+
 ## 🆕 Correcciones al menú lateral
 
 **1. El menú no se podía usar en el celular** — se corrigió un problema
