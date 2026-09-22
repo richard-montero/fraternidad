@@ -310,17 +310,29 @@ ningún cambio ahí.
 
 ## 🆕 Corrección: "Activar acceso" fallaba con "Email address ... is invalid"
 
-Supabase se volvió más estricto validando correos: rechaza dominios que
-no parezcan reales, y el correo temporal que se generaba
-(`<celular>@temporal.fraternidad`) usaba un dominio inventado que ya no
-pasa esa validación.
+Esto tuvo dos intentos — el primero (usar `example.com`) no fue suficiente, así que va la explicación completa.
 
-**La corrección:** el correo temporal ahora se genera como
-`<celular>@example.com` — `example.com` es un dominio reservado
-oficialmente por norma internacional (RFC 2606) para que nunca se use
-de verdad, así que siempre va a pasar la validación de Supabase. No
-cambia nada del funcionamiento: sigue sin ser un correo real, y el
-socio sigue definiendo su correo verdadero en su primer ingreso.
+Supabase no solo revisa que el correo tenga buen formato: también valida
+que el dominio pueda recibir correo de verdad (existe un registro
+técnico llamado "MX" que indica eso). El dominio inventado
+(`temporal.fraternidad`) fallaba por eso, y `example.com` **también**
+falla — aunque es un dominio real y reservado, deliberadamente no tiene
+esa configuración de correo.
+
+**La corrección definitiva:** el correo temporal ahora se genera como
+`<celular>@gmail.com` — Gmail sí tiene esa configuración, así que el
+formato pasa la validación de Supabase sin problema.
+
+**Importante:** esa dirección `@gmail.com` nunca es una casilla de
+correo real que controle la fraternidad ni el socio — es solo un
+formato que Supabase acepta. Nunca se envía nada ahí porque la
+confirmación de correo está desactivada al crear la cuenta. Por eso,
+mientras un socio no haya completado su "primer ingreso" (o mientras no
+le hayas puesto su correo real), **nunca uses "Enviar enlace de
+restablecimiento"** para ese socio — iría a un `@gmail.com` que no le
+pertenece. Una vez que el socio registra su correo real (en su primer
+ingreso, o si tú se lo cambias directamente), ya no hay ningún riesgo:
+los enlaces van a su correo real.
 
 No hace falta ningún script SQL para esto — es puro código.
 
@@ -389,11 +401,11 @@ Ya no hace falta conocer el correo real de cada socio para registrarlo.
 
 **Al crear un socio** (manual o por Excel), si dejas el correo vacío:
 - Se genera automáticamente un correo temporal a partir de su celular:
-  `<celular>@example.com`.
+  `<celular>@gmail.com`.
 - Si tampoco conoces su celular real, puedes inventar un número
   correlativo único (ej. `70000001`, `70000002`, `70000003`…) — solo
   tiene que no repetirse. El correo temporal saldría entonces
-  `70000001@example.com`.
+  `70000001@gmail.com`.
 - Ese socio queda marcado como "Primer ingreso pendiente" (se ve en la
   tabla de Socios).
 

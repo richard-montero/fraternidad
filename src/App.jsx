@@ -1072,6 +1072,13 @@ function Socios({ ctx, irAFicha }) {
 
   async function enviarRestablecimiento(socio) {
     if (!socio.email) { setMensajeDetalle({ tipo: "error", texto: "Este socio no tiene correo registrado." }); return; }
+    if (socio.requiere_configuracion_inicial) {
+      setMensajeDetalle({
+        tipo: "error",
+        texto: "Este socio todavía no registró su correo real (sigue con un correo provisional) — no se puede enviar nada ahí. Pídele que primero complete su \"primer ingreso\", o cambia su correo aquí en Editar datos.",
+      });
+      return;
+    }
     try {
       await ctx.enviarRestablecimientoPassword(socio.email);
       setMensajeDetalle({ tipo: "exito", texto: `Se envió un enlace para restablecer la contraseña al correo ${socio.email}.` });
@@ -1266,11 +1273,12 @@ function Socios({ ctx, irAFicha }) {
                                 </div>
                                 <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 8 }}>
                                   Para cambiar la contraseña de un socio, se le envía un enlace de restablecimiento a su correo — por seguridad, la aplicación no puede fijarla directamente.
+                                  {s.requiere_configuracion_inicial && " Este socio todavía no registró su correo real, así que esta opción está deshabilitada por ahora."}
                                 </p>
                                 <div className="mt-3 flex gap-2 flex-wrap">
                                   <Btn onClick={() => guardarEstado(s)}>Guardar estado</Btn>
                                   <Btn onClick={() => guardarRol(s)}>Guardar rol</Btn>
-                                  <Btn variante="secondary" onClick={() => enviarRestablecimiento(s)}>Enviar enlace de restablecimiento</Btn>
+                                  <Btn variante="secondary" onClick={() => enviarRestablecimiento(s)} disabled={s.requiere_configuracion_inicial}>Enviar enlace de restablecimiento</Btn>
                                 </div>
                               </>
                             )}

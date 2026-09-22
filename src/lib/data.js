@@ -99,11 +99,14 @@ export async function listarSocios() {
 // inventado, ej. 70000001), para socios de los que aún no se conoce su
 // correo real.
 export function correoTemporalDesdeCelular(celular) {
-  // example.com está reservado por norma internacional (RFC 2606) para que
-  // nunca se use de verdad — a diferencia de un dominio inventado como
-  // "temporal.fraternidad", este SÍ pasa la validación de Supabase, que
-  // rechaza dominios que no parezcan reales.
-  return `${celular.trim().replace(/\s+/g, "")}@example.com`;
+  // Supabase valida que el dominio del correo pueda recibir correo de
+  // verdad (revisa que tenga configurado un registro MX) — por eso un
+  // dominio inventado ("temporal.fraternidad") o incluso un dominio
+  // reservado sin correo real (example.com) quedan rechazados como
+  // "inválidos". gmail.com sí tiene esa configuración, así que el
+  // formato pasa la validación — nunca se envía nada ahí de verdad,
+  // porque la confirmación de correo está desactivada para el alta.
+  return `${celular.trim().replace(/\s+/g, "")}@gmail.com`;
 }
 
 export async function crearSocio({ nombre, celular, email, fechaNacimiento, turno, rol = "socio", estado = "patrimonial", password, crearAcceso = true }) {
