@@ -336,6 +336,43 @@ externo).
 
 ---
 
+## 🆕 Ícono en la pantalla de inicio (iOS y Android)
+
+Cualquier socio puede agregar un ícono de la app a su celular, para
+abrirla directo sin pasar por el navegador cada vez. Es una acción que
+hace cada persona desde su propio teléfono — no hay nada que instalar
+"desde la aplicación".
+
+**En iPhone / iPad (Safari):**
+1. Abre el enlace de la aplicación en **Safari** (tiene que ser Safari, no Chrome — en iOS solo Safari puede hacer esto).
+2. Toca el botón de **Compartir** (el cuadrado con la flecha hacia arriba), en la barra inferior.
+3. Baja y toca **"Agregar a inicio"** (Add to Home Screen).
+4. Confirma el nombre (por defecto dice "Fraternidad") y toca **"Agregar"**.
+5. Aparece un ícono nuevo en la pantalla de inicio — al tocarlo, abre la app a pantalla completa, sin la barra de direcciones de Safari.
+
+**En Android (Chrome):**
+1. Abre el enlace de la aplicación en **Chrome**.
+2. Toca el menú de **tres puntos** (arriba a la derecha).
+3. Toca **"Instalar aplicación"** o **"Agregar a pantalla de inicio"** (el texto exacto varía un poco según la versión de Chrome).
+4. Confirma — aparece el ícono, y se abre como una app independiente.
+
+Ya preparé el ícono (mismo diseño que el favicon: fondo verde tintero,
+"F" dorada) y la configuración necesaria para que ambos casos funcionen
+bien — sin esto, "Agregar a inicio" igual funciona, pero deja una
+captura de pantalla genérica en vez de un ícono propio, y abre dentro
+del navegador en vez de a pantalla completa.
+
+**Una limitación a tener en cuenta:** el nombre que se ve bajo el ícono
+(y el que se le sugiere a cada socio al agregarlo) sale de un archivo
+fijo, no del nombre editable de Configuración anual. Si cambias el
+nombre de la fraternidad ahí, los íconos que la gente ya agregó a su
+pantalla de inicio van a seguir mostrando el nombre anterior debajo —
+solo se actualiza para quien lo agregue de nuevo después de que
+despliegues un cambio al archivo `public/manifest.webmanifest` (y a
+`apple-mobile-web-app-title` en `index.html`) con el nombre nuevo.
+
+---
+
 ## 🆕 Corrección: "Activar acceso" fallaba con "Email address ... is invalid"
 
 Esto tuvo dos intentos — el primero (usar `example.com`) no fue suficiente, así que va la explicación completa.
