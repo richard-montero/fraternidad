@@ -1644,6 +1644,7 @@ function LedgerConSaldo({ movimientos }) {
     acumulado += Number(m.debe) - Number(m.haber);
     return { ...m, saldo: acumulado };
   });
+  const filasParaMostrar = filas.slice().reverse(); // más reciente arriba (el saldo ya quedó bien calculado en orden cronológico)
   const totalDebe = sumar(movimientos, "debe");
   const totalHaber = sumar(movimientos, "haber");
   if (filas.length === 0) return <Vacio>Aún no hay movimientos registrados en esta cuenta.</Vacio>;
@@ -1652,7 +1653,7 @@ function LedgerConSaldo({ movimientos }) {
       <table className="ledger">
         <thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Debe</th><th className="num">Haber</th><th className="num">Saldo</th></tr></thead>
         <tbody>
-          {filas.map((f) => (
+          {filasParaMostrar.map((f) => (
             <tr key={f.id}>
               <td>{fdate(f.fecha)}</td>
               <td>{f.concepto}</td>
