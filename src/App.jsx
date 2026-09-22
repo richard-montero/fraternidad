@@ -17,6 +17,7 @@ const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto"
 
 const ROLES_ACCESO = [
   { value: "socio", label: "Socio" },
+  { value: "pasivo", label: "Pasivo" },
   { value: "supervisor", label: "Supervisor" },
   { value: "admin", label: "Administrador" },
   { value: "superadmin", label: "Súper administrador" },
@@ -63,6 +64,7 @@ function tonoRol(rol) {
   if (rol === "superadmin") return "dorado";
   if (rol === "admin") return "verde";
   if (rol === "supervisor") return "azul";
+  if (rol === "pasivo") return "morado";
   return "gris";
 }
 function etiquetaEstado(estado) {
@@ -218,6 +220,7 @@ export default function App() {
 
   const ctx = { sesion, confirmar, nombreFraternidad, setNombreFraternidad, ...ctxData };
   const verAdmin = puedeVer(sesion.rol);
+  const esPasivo = sesion.rol === "pasivo";
   const NAV_ADMIN = [
     { id: "dashboard", label: "Panel general", icon: LayoutDashboard },
     { id: "socios", label: "Socios", icon: Users },
@@ -233,15 +236,23 @@ export default function App() {
     { id: "pagar_qr", label: "Pagar con QR", icon: QrCode },
     { id: "turno_cumple", label: "Turno/Cumpleaños", icon: Cake },
   ];
-  const items = verAdmin ? NAV_ADMIN : NAV_SOCIO;
-  const tituloVista = items.find((i) => i.id === vista)?.label || "Ficha de socio";
+  const NAV_PASIVO = [
+    { id: "pagar_qr", label: "Pagar con QR", icon: QrCode },
+    { id: "turno_cumple", label: "Turno/Cumpleaños", icon: Cake },
+  ];
+  const items = verAdmin ? NAV_ADMIN : esPasivo ? NAV_PASIVO : NAV_SOCIO;
+  // Un socio "Pasivo" no tiene Panel general ni Ficha propia — si por
+  // alguna razón la vista quedó en una de esas (por ejemplo, es la que
+  // trae por defecto al recargar la página), lo mandamos a Pagar con QR.
+  const vistaEfectiva = esPasivo && (vista === "dashboard" || vista === "ficha") ? "pagar_qr" : vista;
+  const tituloVista = items.find((i) => i.id === vistaEfectiva)?.label || "Ficha de socio";
 
   return (
     <div className="min-h-screen flex" style={{ background: "var(--paper)", fontFamily: "var(--font-body)", color: "var(--text)" }}>
       <ToastHost />
       {ConfirmUI}
 
-      <Sidebar sesion={sesion} vista={vista} items={items} irA={irA} onSalir={cerrarSesion} abierto={menuAbierto} cerrar={() => setMenuAbierto(false)} nombreFraternidad={nombreFraternidad} />
+      <Sidebar sesion={sesion} vista={vistaEfectiva} items={items} irA={irA} onSalir={cerrarSesion} abierto={menuAbierto} cerrar={() => setMenuAbierto(false)} nombreFraternidad={nombreFraternidad} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="md:hidden no-print flex items-center justify-between px-4 py-3 sticky top-0" style={{ background: "var(--ink)", color: "#fff", zIndex: 30 }}>
@@ -253,23 +264,23 @@ export default function App() {
         </header>
 
         <main className="flex-1 w-full px-4 py-6 sm:px-8 sm:py-10" style={{ maxWidth: 1180 }}>
-          {vista === "dashboard" && <Dashboard ctx={ctx} irASocio={(id) => { setSocioSeleccionado(id); setVista("ficha"); }} />}
-          {vista === "pagar_qr" && <PagarQR ctx={ctx} />}
-          {vista === "socios" && verAdmin && (
+          {vistaEfectiva === "dashboard" && !esPasivo && <Dashboard ctx={ctx} irASocio={(id) => { setSocioSeleccionado(id); setVista("ficha"); }} />}
+          {vistaEfectiva === "pagar_qr" && <PagarQR ctx={ctx} />}
+          {vistaEfectiva === "socios" && verAdmin && (
             <Socios ctx={ctx} irAFicha={(id) => { setSocioSeleccionado(id); setVista("ficha"); }} />
           )}
-          {vista === "ficha" && (
+          {vistaEfectiva === "ficha" && !esPasivo && (
             <FichaSocio
               ctx={ctx}
               socioId={verAdmin ? socioSeleccionado : sesion.id}
               volver={() => setVista(verAdmin ? "socios" : "dashboard")}
             />
           )}
-          {vista === "ingresos" && verAdmin && <Ingresos ctx={ctx} />}
-          {vista === "gastos" && verAdmin && <Gastos ctx={ctx} />}
-          {vista === "reportes" && verAdmin && <Reportes ctx={ctx} />}
-          {vista === "turno_cumple" && <TurnoCumpleanos ctx={ctx} />}
-          {vista === "configuracion" && puedeEditar(sesion.rol) && <Configuracion ctx={ctx} />}
+          {vistaEfectiva === "ingresos" && verAdmin && <Ingresos ctx={ctx} />}
+          {vistaEfectiva === "gastos" && verAdmin && <Gastos ctx={ctx} />}
+          {vistaEfectiva === "reportes" && verAdmin && <Reportes ctx={ctx} />}
+          {vistaEfectiva === "turno_cumple" && <TurnoCumpleanos ctx={ctx} />}
+          {vistaEfectiva === "configuracion" && puedeEditar(sesion.rol) && <Configuracion ctx={ctx} />}
         </main>
       </div>
     </div>
@@ -650,6 +661,7 @@ function Badge({ children, tono = "gris" }) {
     gris: { bg: "#e6e7e0", color: "var(--text-muted)" },
     dorado: { bg: "var(--gold-bg)", color: "var(--gold)" },
     azul: { bg: "#e4ecf1", color: "#2b5a7a" },
+    morado: { bg: "#ece3f0", color: "#6b3f82" },
   };
   const s = map[tono];
   return <span style={{ background: s.bg, color: s.color, padding: "2px 9px", borderRadius: 100, fontSize: "0.75rem", fontWeight: 600, whiteSpace: "nowrap" }}>{children}</span>;
@@ -2836,7 +2848,7 @@ function Configuracion({ ctx }) {
     e.preventDefault();
     const ok = await ctx.confirmar({
       titulo: "Generar mensualidades",
-      mensaje: `Se creará la obligación de ${MESES[mesGen - 1]} de ${anioGen} para todos los socios activos que aún no la tengan.`,
+      mensaje: `Se creará la obligación de ${MESES[mesGen - 1]} de ${anioGen} para todos los socios activos que aún no la tengan (los de baja y los de rol Pasivo quedan afuera).`,
       textoConfirmar: "Generar",
     });
     if (!ok) return;
@@ -2886,7 +2898,7 @@ function Configuracion({ ctx }) {
       <Card style={{ marginBottom: 20 }}>
         <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Generar mensualidades</h3>
         <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-          Genera la obligación mensual para todos los socios activos del mes y año seleccionados. No se duplican obligaciones ya generadas.
+          Genera la obligación mensual para todos los socios activos del mes y año seleccionados (los de baja y los de rol Pasivo no reciben). No se duplican obligaciones ya generadas.
         </p>
         {msgGen && <Mensaje tipo={msgGen.tipo}>{msgGen.texto}</Mensaje>}
         <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>

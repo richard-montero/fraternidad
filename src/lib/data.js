@@ -338,9 +338,9 @@ export async function generarMensualidades(anio, mes, socios, configAnual) {
   if (errGen) throw errGen;
   const idsConObligacion = new Set(yaGeneradas.map((o) => o.socio_id));
 
-  const activos = socios.filter((s) => s.estado !== "de_baja" && !idsConObligacion.has(s.id));
+  const activos = socios.filter((s) => s.estado !== "de_baja" && s.rol !== "pasivo" && !idsConObligacion.has(s.id));
   if (activos.length === 0) {
-    return { ok: true, mensaje: "No se generaron obligaciones nuevas: ya existían para todos los socios (los socios de baja no reciben mensualidades)." };
+    return { ok: true, mensaje: "No se generaron obligaciones nuevas: ya existían para todos los socios (los socios de baja o con rol Pasivo no reciben mensualidades)." };
   }
 
   const nuevasObligaciones = activos.map((s) => ({ socio_id: s.id, anio, mes }));

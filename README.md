@@ -336,6 +336,30 @@ externo).
 
 ---
 
+## 🆕 Nuevo rol: Pasivo
+
+**Paso 15:** en Supabase → SQL Editor, ejecuta `supabase/13_rol_pasivo.sql`.
+
+Un socio con rol **Pasivo** solo ve, en todo el sistema, **"Pagar con
+QR"** y **"Turno/Cumpleaños"** — ni siquiera ve su propio resumen
+financiero ("Mi resumen"). Es el rol más restringido que existe (más
+que "Socio").
+
+Para asignarlo: **Socios → Gestionar → Estado y rol de acceso**
+(solo lo puede hacer el súper administrador, igual que con los demás
+roles) → elige "Pasivo" en el selector de Rol → Guardar rol.
+
+A nivel de permisos de base de datos, un socio Pasivo tiene exactamente
+los mismos permisos que un Socio normal — la restricción de qué ve es
+del lado de la aplicación (el menú y las pantallas), no cambia nada de
+seguridad adicional.
+
+**Además:** al usar "Generar mensualidades" (Configuración anual), los
+socios con rol Pasivo quedan excluidos — igual que los socios "de
+baja", no se les genera ninguna obligación mensual nueva.
+
+---
+
 ## 🆕 Tercer QR: Obligaciones Mensuales
 
 **Paso 14:** en Supabase → SQL Editor, ejecuta `supabase/12_qr_mensual.sql`
