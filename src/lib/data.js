@@ -182,6 +182,14 @@ export async function completarConfiguracionInicial(socioId, { nuevoCorreo, nuev
   if (errSocio) throw errSocio;
 }
 
+// Cambiar la propia contraseña, en cualquier momento (no solo en el
+// primer ingreso) — lo puede hacer cualquier socio con sesión activa,
+// sin depender de que su cuenta haya quedado marcada como "pendiente".
+export async function cambiarMiPassword(nuevaPassword) {
+  const { error } = await supabase.auth.updateUser({ password: nuevaPassword });
+  if (error) throw error;
+}
+
 // Cambiar el estado (Patrimonial / Invitado / De baja) — la base de
 // datos exige que solo un súper administrador pueda hacerlo (trigger en
 // supabase/04_cambios.sql), independientemente de qué muestre la interfaz.

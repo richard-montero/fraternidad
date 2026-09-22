@@ -336,6 +336,24 @@ externo).
 
 ---
 
+## 🆕 Cambiar mi contraseña — disponible siempre, no solo en el primer ingreso
+
+Se detectó un vacío real: si a un socio se le da acceso con su correo
+real directo (en vez de uno temporal), nunca pasa por la pantalla
+obligatoria de "Configura tu cuenta" — así que se quedaba para siempre
+con la contraseña `123456`, sin ninguna forma de cambiarla por su
+cuenta.
+
+**La corrección:** ahora hay un botón **"Cambiar mi contraseña"** debajo
+de "Cerrar sesión", en el menú lateral — visible para cualquier persona
+con sesión activa, en cualquier momento, sin importar cómo haya
+ingresado la primera vez. Solo pide la contraseña nueva (mínimo 6
+caracteres) dos veces, y queda activa al instante.
+
+No hace falta ningún script SQL para esto — es puro código.
+
+---
+
 ## 🆕 Ícono en la pantalla de inicio (iOS y Android)
 
 Cualquier socio puede agregar un ícono de la app a su celular, para

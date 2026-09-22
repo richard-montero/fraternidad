@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useState, Fragment, cloneElemen
 import {
   LayoutDashboard, Users, ArrowDownCircle, ArrowUpCircle, BarChart3,
   Settings, LogOut, Plus, X, ChevronRight, ChevronUp, ChevronDown, Paperclip, Check,
-  Menu, Eye, EyeOff, Trash2, Download, Printer, Pencil, AlertCircle, QrCode, Cake,
+  Menu, Eye, EyeOff, Trash2, Download, Printer, Pencil, AlertCircle, QrCode, Cake, KeyRound,
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient.js";
 import * as api from "./lib/data.js";
@@ -477,6 +477,8 @@ function ConfigurarCuentaInicial({ socioId, nombreFraternidad, onListo, onSalir 
 // SIDEBAR (fija en escritorio, cajón deslizante en móvil)
 // =====================================================================
 function Sidebar({ sesion, vista, items, irA, onSalir, abierto, cerrar, nombreFraternidad }) {
+  const [modalPassword, setModalPassword] = useState(false);
+
   const contenido = (
     <div className="flex flex-col gap-6 h-full" style={{ width: "var(--sidebar-w)", background: "var(--ink)", color: "#e2ece5", padding: "24px 16px" }}>
       <div className="flex items-center justify-between">
@@ -507,6 +509,9 @@ function Sidebar({ sesion, vista, items, irA, onSalir, abierto, cerrar, nombreFr
         <button onClick={onSalir} className="w-full flex items-center justify-center gap-1.5 mt-2" style={{ background: "none", border: "1px solid #3d5c4c", color: "#dfe8e2", padding: "7px 10px", borderRadius: 6, cursor: "pointer" }}>
           <LogOut size={14} /> Cerrar sesión
         </button>
+        <button onClick={() => setModalPassword(true)} className="w-full flex items-center justify-center gap-1.5 mt-2" style={{ background: "none", border: "none", color: "#9fb3a7", padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontSize: "0.78rem" }}>
+          <KeyRound size={13} /> Cambiar mi contraseña
+        </button>
       </div>
     </div>
   );
@@ -528,7 +533,90 @@ function Sidebar({ sesion, vista, items, irA, onSalir, abierto, cerrar, nombreFr
           </div>
         </div>
       )}
+
+      {modalPassword && <ModalCambiarPassword onCerrar={() => setModalPassword(false)} />}
     </>
+  );
+}
+
+function ModalCambiarPassword({ onCerrar }) {
+  const [password, setPassword] = useState("");
+  const [confirmar, setConfirmar] = useState("");
+  const [verPassword, setVerPassword] = useState(false);
+  const [error, setError] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  const [exito, setExito] = useState(false);
+
+  async function guardar(e) {
+    e.preventDefault();
+    setError(null);
+    if (password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); return; }
+    if (password !== confirmar) { setError("Las dos contraseñas no coinciden."); return; }
+    setGuardando(true);
+    try {
+      await api.cambiarMiPassword(password);
+      setExito(true);
+      aviso.exito("Tu contraseña se actualizó correctamente.");
+    } catch (err) {
+      setError(err.message || "No se pudo actualizar la contraseña.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 flex items-center justify-center p-4 drawer-backdrop" style={{ zIndex: 70 }} onClick={onCerrar}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full"
+        style={{ maxWidth: 380, background: "var(--paper-card)", border: "1px solid var(--line)", borderRadius: 8, padding: 24, boxShadow: "0 12px 32px rgba(20,46,34,.22)" }}
+      >
+        <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Cambiar mi contraseña</h3>
+
+        {error && <Mensaje tipo="error">{error}</Mensaje>}
+
+        {exito ? (
+          <>
+            <Mensaje tipo="exito">Listo — la próxima vez que ingreses, usa tu contraseña nueva.</Mensaje>
+            <Btn onClick={onCerrar} className="w-full justify-center">Cerrar</Btn>
+          </>
+        ) : (
+          <form onSubmit={guardar}>
+            <div className="flex flex-col gap-3.5 mb-4">
+              <Field label="Nueva contraseña (mínimo 6 caracteres)">
+                <div className="relative">
+                  <input
+                    className="field-input"
+                    style={{ paddingRight: 40 }}
+                    type={verPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVerPassword((v) => !v)}
+                    className="absolute"
+                    style={{ right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}
+                    aria-label={verPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {verPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
+              </Field>
+              <Field label="Confirmar nueva contraseña">
+                <input className="field-input" type={verPassword ? "text" : "password"} required value={confirmar} onChange={(e) => setConfirmar(e.target.value)} />
+              </Field>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Btn variante="secondary" type="button" onClick={onCerrar}>Cancelar</Btn>
+              <Btn type="submit" disabled={guardando}>{guardando ? "Guardando…" : "Guardar contraseña"}</Btn>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
   );
 }
 
