@@ -947,12 +947,6 @@ function ImagenQR({ ctx, tipo }) {
 // =====================================================================
 // TURNO / CUMPLEAÑOS — visible para todos los socios
 // =====================================================================
-function fdateDiaMes(f) {
-  if (!f) return "";
-  const d = new Date(f + "T00:00:00");
-  return d.toLocaleDateString("es-BO", { day: "2-digit", month: "2-digit" });
-}
-
 function TurnoCumpleanos({ ctx }) {
   const [tab, setTab] = useState("turnos");
 
@@ -1006,9 +1000,14 @@ function Turneros({ ctx }) {
         {lista.length === 0 ? (
           <Vacio>Ningún socio tiene el turno de {mes}.</Vacio>
         ) : (
-          <ol style={{ margin: 0, paddingLeft: 22 }}>
-            {lista.map((s) => <li key={s.id} style={{ padding: "5px 0", borderBottom: "1px solid var(--line)" }}>{s.nombre}</li>)}
-          </ol>
+          <div>
+            {lista.map((s, i) => (
+              <div key={s.id} className="flex items-center gap-2" style={{ padding: "5px 0", borderBottom: "1px solid var(--line)" }}>
+                <span className="monto" style={{ color: "var(--text-muted)", minWidth: 24 }}>{i + 1}.</span>
+                <span>{s.nombre}</span>
+              </div>
+            ))}
+          </div>
         )}
       </Card>
     </div>
@@ -1040,16 +1039,17 @@ function Cumpleanos({ ctx }) {
         {lista.length === 0 ? (
           <Vacio>Ningún socio cumple años en {mes} (o no tiene fecha de nacimiento registrada).</Vacio>
         ) : (
-          <ol style={{ margin: 0, paddingLeft: 22 }}>
-            {lista.map((s) => (
-              <li key={s.id} style={{ padding: "5px 0", borderBottom: "1px solid var(--line)" }}>
-                <span className="flex justify-between" style={{ maxWidth: 360 }}>
+          <div>
+            {lista.map((s, i) => (
+              <div key={s.id} className="flex items-center gap-2" style={{ padding: "5px 0", borderBottom: "1px solid var(--line)" }}>
+                <span className="monto" style={{ color: "var(--text-muted)", minWidth: 24 }}>{i + 1}.</span>
+                <span className="flex-1 flex justify-between" style={{ maxWidth: 360 }}>
                   <span>{s.nombre}</span>
-                  <span className="monto" style={{ color: "var(--text-muted)" }}>{fdateDiaMes(s.fecha_nacimiento)}</span>
+                  <span className="monto" style={{ color: "var(--text-muted)" }}>{fdate(s.fecha_nacimiento)}</span>
                 </span>
-              </li>
+              </div>
             ))}
-          </ol>
+          </div>
         )}
       </Card>
     </div>
