@@ -10,6 +10,7 @@ import { useAppData } from "./hooks/useAppData.js";
 import { exportarCSV } from "./lib/csv.js";
 import { exportarExcel, descargarPlantillaImportacion } from "./lib/excel.js";
 import { leerLibroExcel, importarDatos } from "./lib/importar.js";
+import { generarEstadoCuentaPDF } from "./lib/estadoCuenta.js";
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
@@ -1322,6 +1323,24 @@ function FichaSocio({ ctx, socioId, volver }) {
             <Badge tono={tonoEstado(socio.estado)}>{etiquetaEstado(socio.estado)}</Badge>{" "}
             <Badge tono={tonoRol(socio.rol)}>{etiquetaRol(socio.rol)}</Badge>
           </p>
+        </div>
+        <div className="no-print">
+          <Btn
+            variante="secondary"
+            icon={Download}
+            onClick={() => generarEstadoCuentaPDF({
+              nombreFraternidad: ctx.nombreFraternidad,
+              socio,
+              movP: ctx.movPatrimoniales[socio.id] || [],
+              movM: ctx.movMensuales[socio.id] || [],
+              aportesVol: ctx.aportesVoluntarios.filter((a) => a.socio_id === socio.id),
+              acordadoPatrimonial: ctx.obligPatrimoniales[socio.id] || 0,
+              saldoPatrimonial: ctx.saldoPatrimonial(socio.id),
+              saldoMensual: ctx.saldoMensual(socio.id),
+            })}
+          >
+            Estado de cuenta (PDF)
+          </Btn>
         </div>
       </div>
 

@@ -308,6 +308,34 @@ ningún cambio ahí.
 
 ---
 
+## 🆕 Estado de cuenta en PDF, desde la ficha de cada socio
+
+En la ficha de cualquier socio hay un botón **"Estado de cuenta (PDF)"**
+(arriba, junto al nombre) que genera y descarga un PDF con el mismo
+formato que usabas en tu sistema anterior:
+
+- Encabezado con el nombre de la fraternidad, la fecha del reporte y el
+  nombre del socio, repetido en cada página.
+- **Patrimonial**: monto total acordado y el mayor completo, con
+  columnas Adeudado / Pagado / Saldo Deudor / Pago Adelantado (el
+  saldo se reparte entre estas dos últimas según si el socio debe o
+  pagó de más).
+- **Obligaciones Mensuales Socios y/o Invitados**: el mismo formato de
+  mayor, con la nota "Para estar al día... debe cancelar Bs.X" al pie,
+  si corresponde.
+- **Aportes Voluntarios**: fecha, concepto, pagado y saldo acumulado.
+- Numeración de página ("Pág: X de Y") en todas las páginas, calculada
+  al final una vez que se sabe cuántas páginas tiene el documento en
+  total, y con saltos de página que nunca cortan una fila de la tabla
+  por la mitad.
+
+El botón está disponible tanto para un administrador viendo la ficha de
+cualquier socio, como para un socio viendo su propia ficha. El PDF se
+genera enteramente en el navegador (no depende de ningún servidor
+externo).
+
+---
+
 ## 🆕 Corrección: "Activar acceso" fallaba con "Email address ... is invalid"
 
 Esto tuvo dos intentos — el primero (usar `example.com`) no fue suficiente, así que va la explicación completa.
