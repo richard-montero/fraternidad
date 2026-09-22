@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as api from "../lib/data.js";
+import { invocarAviso } from "../lib/avisos.js";
 
 function sumar(movs, campo) {
   return movs.reduce((a, m) => a + Number(m[campo]), 0);
@@ -97,6 +98,14 @@ export function useAppData(sesion) {
     recargar();
   }
 
+  // El aviso de confirmación nunca debe frenar ni romper el registro del
+  // pago si el correo falla (por ejemplo, si el proveedor de correo no
+  // está configurado todavía) — por eso se dispara sin esperar y se
+  // ignora cualquier error.
+  function avisarPagoSinBloquear(socioId, monto, concepto, cuenta) {
+    invocarAviso("confirmacion_pago", { socioId, monto, concepto, cuenta }).catch(() => {});
+  }
+
   const acciones = {
     crearSocio: (datos) => accion(() => api.crearSocio(datos)),
     editarSocio: (id, datos) => accion(() => api.editarSocio(id, datos)),
@@ -105,8 +114,14 @@ export function useAppData(sesion) {
     cambiarRolSocio: (id, rol) => accion(() => api.cambiarRolSocio(id, rol)),
     enviarRestablecimientoPassword: (email) => api.enviarRestablecimientoPassword(email),
     crearObligacionPatrimonial: (socioId, monto, fecha) => accion(() => api.crearObligacionPatrimonial(socioId, monto, fecha)),
-    registrarPagoPatrimonial: (socioId, monto, fecha, concepto) => accion(() => api.registrarPagoPatrimonial(socioId, monto, fecha, concepto)),
-    registrarPagoMensual: (socioId, monto, fecha, concepto) => accion(() => api.registrarPagoMensual(socioId, monto, fecha, concepto)),
+    registrarPagoPatrimonial: async (socioId, monto, fecha, concepto) => {
+      await accion(() => api.registrarPagoPatrimonial(socioId, monto, fecha, concepto));
+      avisarPagoSinBloquear(socioId, monto, concepto, "Aporte patrimonial");
+    },
+    registrarPagoMensual: async (socioId, monto, fecha, concepto) => {
+      await accion(() => api.registrarPagoMensual(socioId, monto, fecha, concepto));
+      avisarPagoSinBloquear(socioId, monto, concepto, "Aportes mensuales");
+    },
     registrarAjuste: (tabla, socioId, monto, fecha, concepto, tipo) => accion(() => api.registrarAjuste(tabla, socioId, monto, fecha, concepto, tipo)),
     generarMensualidades: async (anio, mes) => {
       const r = await api.generarMensualidades(anio, mes, socios, configAnual);
@@ -114,7 +129,10 @@ export function useAppData(sesion) {
       return r;
     },
     guardarCuotaAnual: (anio, cuota) => accion(() => api.guardarCuotaAnual(anio, cuota)),
-    registrarAporteVoluntario: (socioId, monto, fecha, concepto, observaciones) => accion(() => api.registrarAporteVoluntario(socioId, monto, fecha, concepto, observaciones)),
+    registrarAporteVoluntario: async (socioId, monto, fecha, concepto, observaciones) => {
+      await accion(() => api.registrarAporteVoluntario(socioId, monto, fecha, concepto, observaciones));
+      avisarPagoSinBloquear(socioId, monto, concepto, "Aporte voluntario");
+    },
     registrarGasto: (gasto, archivo) => accion(() => api.registrarGasto(gasto, archivo)),
     editarGasto: (id, gasto) => accion(() => api.editarGasto(id, gasto)),
     eliminarGasto: (id) => accion(() => api.eliminarGasto(id)),

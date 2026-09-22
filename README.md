@@ -336,6 +336,136 @@ externo).
 
 ---
 
+## 🆕 Avisos por correo (recordatorios, confirmaciones, cumpleaños, anuncios)
+
+Esta es la primera función de la aplicación que necesita algo más que
+pegar SQL o hacer `git push` — necesita una **función en la nube**
+(Edge Function de Supabase) porque mandar un correo real requiere una
+llave secreta que nunca debe estar en el navegador. Son pasos nuevos,
+pero cada uno es una sola vez.
+
+### Qué hace
+
+- **Confirmación de pago** — se manda sola, automáticamente, apenas se
+  registra un aporte patrimonial, mensual o voluntario de un socio.
+- **Recordatorio de saldo pendiente** — a pedido (botón en Configuración
+  anual) o programado (por ejemplo, el día 1 de cada mes).
+- **Aviso general** (reuniones, eventos, anuncios) — a pedido, con
+  asunto y mensaje libres, a todos los socios.
+- **Cumpleaños del día** — a pedido o programado a diario, felicita a
+  quien cumpla años ese día.
+
+Nunca se manda nada al correo temporal de un socio que todavía no
+completó su primer ingreso — solo a quien ya tiene su correo real
+confirmado.
+
+### Paso A: Crear tu cuenta de Resend (el servicio que manda los correos)
+
+1. Entra a **[resend.com](https://resend.com)** y crea una cuenta gratis (alcanza de sobra para esto).
+2. Ve a **API Keys** → **Create API Key** → cópiala (la vas a necesitar en el Paso C).
+3. (Opcional pero recomendado) En **Domains**, agrega y verifica tu propio dominio para que los correos salgan de una dirección con el nombre de tu fraternidad. Si no tienes dominio propio, puedes usar el remitente de prueba de Resend mientras tanto (`onboarding@resend.dev`) — funciona, pero es menos profesional.
+
+### Paso B: Instalar la Supabase CLI en tu computadora
+
+Esto se instala una sola vez en tu computadora (no en el proyecto).
+
+1. Instala **Node.js** si no lo tienes ([nodejs.org](https://nodejs.org)).
+2. Abre una terminal y ejecuta:
+   ```bash
+   npm install -g supabase
+   supabase login
+   ```
+   (Te abre el navegador para iniciar sesión con tu cuenta de Supabase.)
+3. Dentro de la carpeta de tu proyecto (la misma donde está `package.json`), ejecuta:
+   ```bash
+   supabase link --project-ref TU-PROJECT-REF
+   ```
+   El `TU-PROJECT-REF` lo encuentras en tu proyecto de Supabase → Project Settings → General → "Reference ID".
+
+### Paso C: Configurar las claves secretas de la función
+
+En una terminal, dentro de la carpeta del proyecto:
+
+```bash
+supabase secrets set RESEND_API_KEY=tu_api_key_de_resend
+supabase secrets set CLAVE_CRON=inventa-una-clave-larga-y-secreta-aqui
+supabase secrets set REMITENTE="Fraternidad <avisos@tudominio.com>"
+```
+
+`CLAVE_CRON` es una clave que inventas tú (como una contraseña larga) —
+solo la usan los envíos automáticos programados, para demostrar que son
+legítimos. Guárdala, la necesitas en el Paso E.
+
+Si todavía no tienes dominio propio verificado en Resend, usa
+`REMITENTE="Fraternidad <onboarding@resend.dev>"` mientras tanto.
+
+### Paso D: Desplegar la función y ejecutar el script SQL
+
+```bash
+supabase functions deploy enviar-avisos
+```
+
+Y en Supabase → SQL Editor, ejecuta `supabase/11_avisos.sql` (para la
+tabla que evita mandar el mismo aviso dos veces el mismo día).
+
+### Paso E (opcional): Programar los envíos automáticos
+
+Si quieres que los recordatorios y los cumpleaños se manden solos, sin
+que tengas que apretar el botón, ejecuta esto en el SQL Editor
+(reemplaza `TU-PROJECT-REF` y `TU-CLAVE-CRON` por los tuyos):
+
+```sql
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+
+select cron.schedule(
+  'recordatorio-mensual',
+  '0 13 1 * *', -- día 1 de cada mes, 13:00 UTC (09:00 hora Bolivia)
+  $$
+  select net.http_post(
+    url := 'https://TU-PROJECT-REF.supabase.co/functions/v1/enviar-avisos',
+    headers := jsonb_build_object('Content-Type','application/json','x-clave-cron','TU-CLAVE-CRON'),
+    body := jsonb_build_object('tipo','recordatorio_pendientes')
+  );
+  $$
+);
+
+select cron.schedule(
+  'cumpleanos-diario',
+  '0 12 * * *', -- todos los días, 12:00 UTC (08:00 hora Bolivia)
+  $$
+  select net.http_post(
+    url := 'https://TU-PROJECT-REF.supabase.co/functions/v1/enviar-avisos',
+    headers := jsonb_build_object('Content-Type','application/json','x-clave-cron','TU-CLAVE-CRON'),
+    body := jsonb_build_object('tipo','cumpleanos_hoy')
+  );
+  $$
+);
+```
+
+Ajusta los horarios (los números `'minuto hora día mes día-semana'`) a
+tu gusto — estos están en horario UTC, que en Bolivia va 4 horas
+adelantado (UTC-4), por eso "13:00 UTC" es "09:00 en Bolivia".
+
+### Cómo probarlo
+
+1. Ve a **Configuración anual → Avisos por correo**.
+2. Prueba primero "Enviar saludos de hoy" o "Enviar recordatorios ahora"
+   con pocos socios con correo real confirmado — revisa que te llegue
+   bien antes de mandar el aviso general a todos.
+3. Registra un pago de prueba desde **Libro de ingresos** y confirma que
+   llega el correo de confirmación automáticamente.
+
+### Si algo falla
+
+El botón te muestra el resultado ("Se enviaron X correos, Y fallaron")
+— si hay errores, casi siempre es porque falta un secreto (revisa el
+Paso C) o porque la función todavía no se desplegó (Paso D). Puedes ver
+los registros de la función en Supabase → Edge Functions →
+"enviar-avisos" → Logs.
+
+---
+
 ## 🆕 Cambiar mi contraseña — disponible siempre, no solo en el primer ingreso
 
 Se detectó un vacío real: si a un socio se le da acceso con su correo

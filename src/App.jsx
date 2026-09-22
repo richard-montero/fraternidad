@@ -11,6 +11,7 @@ import { exportarCSV } from "./lib/csv.js";
 import { exportarExcel, descargarPlantillaImportacion } from "./lib/excel.js";
 import { leerLibroExcel, importarDatos } from "./lib/importar.js";
 import { generarEstadoCuentaPDF } from "./lib/estadoCuenta.js";
+import { invocarAviso } from "./lib/avisos.js";
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
@@ -2898,6 +2899,8 @@ function Configuracion({ ctx }) {
         <div className="mt-4"><Btn onClick={generar} disabled={generando}>{generando ? "Generando…" : "Generar mensualidades"}</Btn></div>
       </Card>
 
+      <AvisosPorCorreo ctx={ctx} />
+
       <Card style={{ marginBottom: 20 }}>
         <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Historial de cuotas por año</h3>
         {ctx.configAnual.length === 0 ? <Vacio>Aún no se definió ninguna cuota.</Vacio> : (
@@ -2927,6 +2930,116 @@ function Configuracion({ ctx }) {
 
       <ImportadorExcel ctx={ctx} />
     </div>
+  );
+}
+
+// =====================================================================
+// AVISOS POR CORREO — recordatorios, aviso general y cumpleaños de hoy
+// =====================================================================
+function AvisosPorCorreo({ ctx }) {
+  const [enviandoRecordatorios, setEnviandoRecordatorios] = useState(false);
+  const [msgRecordatorios, setMsgRecordatorios] = useState(null);
+
+  const [asunto, setAsunto] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const [enviandoAviso, setEnviandoAviso] = useState(false);
+  const [msgAviso, setMsgAviso] = useState(null);
+
+  const [enviandoCumple, setEnviandoCumple] = useState(false);
+  const [msgCumple, setMsgCumple] = useState(null);
+
+  function resumen(r) {
+    const base = `Se enviaron ${r.enviados} correo(s).`;
+    return r.errores?.length ? `${base} ${r.errores.length} fallaron.` : base;
+  }
+
+  async function enviarRecordatorios() {
+    const ok = await ctx.confirmar({
+      titulo: "Enviar recordatorios de saldo pendiente",
+      mensaje: "Se manda un correo a cada socio con correo real confirmado que tenga saldo pendiente (patrimonial y/o mensual). No se repite el mismo día si ya se envió.",
+      textoConfirmar: "Enviar",
+    });
+    if (!ok) return;
+    setEnviandoRecordatorios(true);
+    setMsgRecordatorios(null);
+    try {
+      const r = await invocarAviso("recordatorio_pendientes");
+      setMsgRecordatorios({ tipo: "exito", texto: resumen(r) });
+      aviso.exito("Recordatorios enviados.");
+    } catch (err) {
+      setMsgRecordatorios({ tipo: "error", texto: err.message || "No se pudo enviar." });
+    } finally {
+      setEnviandoRecordatorios(false);
+    }
+  }
+
+  async function enviarAvisoGeneral(e) {
+    e.preventDefault();
+    if (!asunto.trim() || !mensaje.trim()) { setMsgAviso({ tipo: "error", texto: "Completa el asunto y el mensaje." }); return; }
+    const ok = await ctx.confirmar({
+      titulo: "Enviar aviso general",
+      mensaje: "Se manda este correo a TODOS los socios con correo real confirmado. Esta acción no se puede deshacer.",
+      textoConfirmar: "Enviar a todos",
+    });
+    if (!ok) return;
+    setEnviandoAviso(true);
+    setMsgAviso(null);
+    try {
+      const r = await invocarAviso("aviso_general", { asunto: asunto.trim(), mensaje: mensaje.trim() });
+      setMsgAviso({ tipo: "exito", texto: resumen(r) });
+      aviso.exito("Aviso general enviado.");
+      setAsunto(""); setMensaje("");
+    } catch (err) {
+      setMsgAviso({ tipo: "error", texto: err.message || "No se pudo enviar." });
+    } finally {
+      setEnviandoAviso(false);
+    }
+  }
+
+  async function enviarCumpleanos() {
+    setEnviandoCumple(true);
+    setMsgCumple(null);
+    try {
+      const r = await invocarAviso("cumpleanos_hoy");
+      setMsgCumple({ tipo: "exito", texto: r.enviados > 0 ? resumen(r) : "Nadie cumple años hoy (o ya se les mandó el saludo)." });
+      if (r.enviados > 0) aviso.exito("Saludos de cumpleaños enviados.");
+    } catch (err) {
+      setMsgCumple({ tipo: "error", texto: err.message || "No se pudo enviar." });
+    } finally {
+      setEnviandoCumple(false);
+    }
+  }
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Avisos por correo</h3>
+      <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+        Los avisos solo llegan a socios con un correo real ya confirmado (no a quien sigue con un correo
+        provisional pendiente de primer ingreso). La confirmación de pago se manda sola, automáticamente,
+        cada vez que se registra un aporte — esto de aquí es para lo demás.
+        {" "}Requiere tener configurada la función de envío (ver README, sección "Avisos por correo").
+      </p>
+
+      <h4 style={{ fontSize: "0.9rem", color: "var(--ink-soft)", marginBottom: 6 }}>Recordatorio de saldo pendiente</h4>
+      {msgRecordatorios && <Mensaje tipo={msgRecordatorios.tipo}>{msgRecordatorios.texto}</Mensaje>}
+      <Btn variante="secondary" onClick={enviarRecordatorios} disabled={enviandoRecordatorios}>
+        {enviandoRecordatorios ? "Enviando…" : "Enviar recordatorios ahora"}
+      </Btn>
+
+      <h4 style={{ fontSize: "0.9rem", color: "var(--ink-soft)", margin: "22px 0 6px" }}>Saludo de cumpleaños de hoy</h4>
+      {msgCumple && <Mensaje tipo={msgCumple.tipo}>{msgCumple.texto}</Mensaje>}
+      <Btn variante="secondary" onClick={enviarCumpleanos} disabled={enviandoCumple}>
+        {enviandoCumple ? "Enviando…" : "Enviar saludos de hoy"}
+      </Btn>
+
+      <h4 style={{ fontSize: "0.9rem", color: "var(--ink-soft)", margin: "22px 0 6px" }}>Aviso general (reuniones, eventos, anuncios)</h4>
+      {msgAviso && <Mensaje tipo={msgAviso.tipo}>{msgAviso.texto}</Mensaje>}
+      <div className="grid gap-3.5 mb-3" style={{ gridTemplateColumns: "1fr" }}>
+        <Field label="Asunto"><input className="field-input" value={asunto} onChange={(e) => setAsunto(e.target.value)} /></Field>
+        <Field label="Mensaje"><textarea className="field-input" rows={4} value={mensaje} onChange={(e) => setMensaje(e.target.value)} /></Field>
+      </div>
+      <Btn onClick={enviarAvisoGeneral} disabled={enviandoAviso}>{enviandoAviso ? "Enviando…" : "Enviar a todos los socios"}</Btn>
+    </Card>
   );
 }
 
