@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useState, Fragment, cloneElemen
 import {
   LayoutDashboard, Users, ArrowDownCircle, ArrowUpCircle, BarChart3,
   Settings, LogOut, Plus, X, ChevronRight, ChevronUp, ChevronDown, Paperclip, Check,
-  Menu, Eye, EyeOff, Trash2, Download, Printer, Pencil, AlertCircle, QrCode,
+  Menu, Eye, EyeOff, Trash2, Download, Printer, Pencil, AlertCircle, QrCode, Cake,
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient.js";
 import * as api from "./lib/data.js";
@@ -224,11 +224,13 @@ export default function App() {
     { id: "ingresos", label: "Libro de ingresos", icon: ArrowDownCircle },
     { id: "gastos", label: "Libro de gastos", icon: ArrowUpCircle },
     { id: "reportes", label: "Reportes", icon: BarChart3 },
+    { id: "turno_cumple", label: "Turno/Cumpleaños", icon: Cake },
     ...(puedeEditar(sesion.rol) ? [{ id: "configuracion", label: "Configuración anual", icon: Settings }] : []),
   ];
   const NAV_SOCIO = [
     { id: "dashboard", label: "Mi resumen", icon: LayoutDashboard },
     { id: "pagar_qr", label: "Pagar con QR", icon: QrCode },
+    { id: "turno_cumple", label: "Turno/Cumpleaños", icon: Cake },
   ];
   const items = verAdmin ? NAV_ADMIN : NAV_SOCIO;
   const tituloVista = items.find((i) => i.id === vista)?.label || "Ficha de socio";
@@ -265,6 +267,7 @@ export default function App() {
           {vista === "ingresos" && verAdmin && <Ingresos ctx={ctx} />}
           {vista === "gastos" && verAdmin && <Gastos ctx={ctx} />}
           {vista === "reportes" && verAdmin && <Reportes ctx={ctx} />}
+          {vista === "turno_cumple" && <TurnoCumpleanos ctx={ctx} />}
           {vista === "configuracion" && puedeEditar(sesion.rol) && <Configuracion ctx={ctx} />}
         </main>
       </div>
@@ -938,6 +941,118 @@ function ImagenQR({ ctx, tipo }) {
         </>
       )}
     </Card>
+  );
+}
+
+// =====================================================================
+// TURNO / CUMPLEAÑOS — visible para todos los socios
+// =====================================================================
+function fdateDiaMes(f) {
+  if (!f) return "";
+  const d = new Date(f + "T00:00:00");
+  return d.toLocaleDateString("es-BO", { day: "2-digit", month: "2-digit" });
+}
+
+function TurnoCumpleanos({ ctx }) {
+  const [tab, setTab] = useState("turnos");
+
+  return (
+    <div>
+      <PageHeader title="Turno/Cumpleaños" subtitle="Consulta quién tiene el turno o cumple años en cada mes." />
+
+      <div className="flex gap-1 mb-5" style={{ borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
+        {[["turnos", "Turneros"], ["cumpleanos", "Cumpleaños"]].map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            style={{
+              background: "none", border: "none", padding: "10px 16px", fontWeight: 600, fontSize: "0.88rem", whiteSpace: "nowrap",
+              color: tab === id ? "var(--ink)" : "var(--text-muted)", cursor: "pointer",
+              borderBottom: tab === id ? "2px solid var(--gold)" : "2px solid transparent", marginBottom: -1,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "turnos" && <Turneros ctx={ctx} />}
+      {tab === "cumpleanos" && <Cumpleanos ctx={ctx} />}
+    </div>
+  );
+}
+
+function Turneros({ ctx }) {
+  const [mes, setMes] = useState(TURNOS[new Date().getMonth()]);
+
+  const lista = useMemo(() => (
+    ctx.socios
+      .filter((s) => s.turno === mes)
+      .slice()
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+  ), [ctx.socios, mes]);
+
+  return (
+    <div>
+      <div className="mb-5" style={{ maxWidth: 220 }}>
+        <Field label="Mes">
+          <select className="field-input" value={mes} onChange={(e) => setMes(e.target.value)}>
+            {TURNOS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </Field>
+      </div>
+      <Card>
+        <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Socios con turno en {mes}</h3>
+        {lista.length === 0 ? (
+          <Vacio>Ningún socio tiene el turno de {mes}.</Vacio>
+        ) : (
+          <ol style={{ margin: 0, paddingLeft: 22 }}>
+            {lista.map((s) => <li key={s.id} style={{ padding: "5px 0", borderBottom: "1px solid var(--line)" }}>{s.nombre}</li>)}
+          </ol>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function Cumpleanos({ ctx }) {
+  const [mes, setMes] = useState(TURNOS[new Date().getMonth()]);
+  const mesIndex = TURNOS.indexOf(mes) + 1;
+
+  const lista = useMemo(() => (
+    ctx.socios
+      .filter((s) => s.fecha_nacimiento && Number(s.fecha_nacimiento.slice(5, 7)) === mesIndex)
+      .slice()
+      .sort((a, b) => Number(a.fecha_nacimiento.slice(8, 10)) - Number(b.fecha_nacimiento.slice(8, 10)))
+  ), [ctx.socios, mesIndex]);
+
+  return (
+    <div>
+      <div className="mb-5" style={{ maxWidth: 220 }}>
+        <Field label="Mes">
+          <select className="field-input" value={mes} onChange={(e) => setMes(e.target.value)}>
+            {TURNOS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </Field>
+      </div>
+      <Card>
+        <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Cumpleaños en {mes}</h3>
+        {lista.length === 0 ? (
+          <Vacio>Ningún socio cumple años en {mes} (o no tiene fecha de nacimiento registrada).</Vacio>
+        ) : (
+          <ol style={{ margin: 0, paddingLeft: 22 }}>
+            {lista.map((s) => (
+              <li key={s.id} style={{ padding: "5px 0", borderBottom: "1px solid var(--line)" }}>
+                <span className="flex justify-between" style={{ maxWidth: 360 }}>
+                  <span>{s.nombre}</span>
+                  <span className="monto" style={{ color: "var(--text-muted)" }}>{fdateDiaMes(s.fecha_nacimiento)}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
+    </div>
   );
 }
 
