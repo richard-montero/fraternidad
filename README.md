@@ -336,6 +336,22 @@ externo).
 
 ---
 
+## 🆕 Tercer QR: Obligaciones Mensuales
+
+**Paso 14:** en Supabase → SQL Editor, ejecuta `supabase/12_qr_mensual.sql`
+(amplía los permisos de subida para incluir la nueva clave del QR).
+
+"Pagar con QR" ahora tiene 3 pestañas, en este orden:
+1. **Obligaciones Mensuales** (nueva — pestaña que se abre por defecto)
+2. Alquiler / Uso fraternidad
+3. Patrimonial
+
+Se sube igual que los otros dos, desde **Configuración anual → Pagos con
+QR** — no hace falta crear ningún bucket nuevo, usa el mismo `qr-pagos`
+que ya tenías configurado.
+
+---
+
 ## 🆕 Avisos por correo (recordatorios, confirmaciones, cumpleaños, anuncios)
 
 Esta es la primera función de la aplicación que necesita algo más que

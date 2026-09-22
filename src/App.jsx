@@ -952,14 +952,14 @@ function DashboardSocio({ ctx, irASocio }) {
 // PAGAR CON QR — visible para todos los socios
 // =====================================================================
 function PagarQR({ ctx }) {
-  const [tab, setTab] = useState("alquiler");
+  const [tab, setTab] = useState("mensual");
 
   return (
     <div>
       <PageHeader title="Pagar con QR" subtitle="Escanea el código correspondiente desde tu app bancaria para realizar tu pago." />
 
       <div className="flex gap-1 mb-5" style={{ borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
-        {[["alquiler", "Alquiler / Uso fraternidad"], ["patrimonial", "Patrimonial"]].map(([id, label]) => (
+        {[["mensual", "Obligaciones Mensuales"], ["alquiler", "Alquiler / Uso fraternidad"], ["patrimonial", "Patrimonial"]].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -3055,6 +3055,7 @@ function PagosQR({ ctx }) {
         reemplazarlas cuando quieras — la nueva imagen sustituye a la anterior de inmediato.
       </p>
       <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        <SubidaQR ctx={ctx} tipo="mensual" titulo="QR Obligaciones Mensuales" />
         <SubidaQR ctx={ctx} tipo="alquiler" titulo="QR Alquiler / Uso fraternidad" />
         <SubidaQR ctx={ctx} tipo="patrimonial" titulo="QR Patrimonial" />
       </div>

@@ -462,7 +462,7 @@ export async function obtenerUrlComprobante(ruta) {
 // de cada una se guarda en ajustes_generales bajo una clave fija por
 // tipo, para poder encontrarla y mostrarla después.
 const BUCKET_QR = "qr-pagos";
-const CLAVE_QR = { alquiler: "qr_alquiler_ruta", patrimonial: "qr_patrimonial_ruta" };
+const CLAVE_QR = { mensual: "qr_mensual_ruta", alquiler: "qr_alquiler_ruta", patrimonial: "qr_patrimonial_ruta" };
 
 export async function guardarImagenQR(tipo, archivo) {
   const ext = (archivo.name.split(".").pop() || "png").toLowerCase();
