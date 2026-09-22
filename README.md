@@ -308,6 +308,24 @@ ningún cambio ahí.
 
 ---
 
+## 🆕 Corrección: "Activar acceso" fallaba con "Email address ... is invalid"
+
+Supabase se volvió más estricto validando correos: rechaza dominios que
+no parezcan reales, y el correo temporal que se generaba
+(`<celular>@temporal.fraternidad`) usaba un dominio inventado que ya no
+pasa esa validación.
+
+**La corrección:** el correo temporal ahora se genera como
+`<celular>@example.com` — `example.com` es un dominio reservado
+oficialmente por norma internacional (RFC 2606) para que nunca se use
+de verdad, así que siempre va a pasar la validación de Supabase. No
+cambia nada del funcionamiento: sigue sin ser un correo real, y el
+socio sigue definiendo su correo verdadero en su primer ingreso.
+
+No hace falta ningún script SQL para esto — es puro código.
+
+---
+
 ## 🆕 Corrección: un bloque que fallaba abandonaba el resto silenciosamente
 
 El arreglo anterior (escribir en bloques) hizo la importación mucho más
@@ -371,11 +389,11 @@ Ya no hace falta conocer el correo real de cada socio para registrarlo.
 
 **Al crear un socio** (manual o por Excel), si dejas el correo vacío:
 - Se genera automáticamente un correo temporal a partir de su celular:
-  `<celular>@temporal.fraternidad`.
+  `<celular>@example.com`.
 - Si tampoco conoces su celular real, puedes inventar un número
   correlativo único (ej. `70000001`, `70000002`, `70000003`…) — solo
   tiene que no repetirse. El correo temporal saldría entonces
-  `70000001@temporal.fraternidad`.
+  `70000001@example.com`.
 - Ese socio queda marcado como "Primer ingreso pendiente" (se ve en la
   tabla de Socios).
 

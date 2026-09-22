@@ -99,7 +99,11 @@ export async function listarSocios() {
 // inventado, ej. 70000001), para socios de los que aún no se conoce su
 // correo real.
 export function correoTemporalDesdeCelular(celular) {
-  return `${celular.trim().replace(/\s+/g, "")}@temporal.fraternidad`;
+  // example.com está reservado por norma internacional (RFC 2606) para que
+  // nunca se use de verdad — a diferencia de un dominio inventado como
+  // "temporal.fraternidad", este SÍ pasa la validación de Supabase, que
+  // rechaza dominios que no parezcan reales.
+  return `${celular.trim().replace(/\s+/g, "")}@example.com`;
 }
 
 export async function crearSocio({ nombre, celular, email, fechaNacimiento, turno, rol = "socio", estado = "patrimonial", password, crearAcceso = true }) {
