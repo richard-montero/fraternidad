@@ -1201,7 +1201,6 @@ function Socios({ ctx, irAFicha }) {
     e.preventDefault();
     setError(null);
     if (!celular.trim()) { setError("El número de celular es obligatorio."); return; }
-    if (!email.trim()) { setError("El correo electrónico es obligatorio."); return; }
     if (ctx.socios.some((s) => s.celular === celular.trim())) {
       setError("Ya existe un socio registrado con ese número de celular.");
       return;
@@ -1211,14 +1210,14 @@ function Socios({ ctx, irAFicha }) {
       await ctx.crearSocio({
         nombre: nombre.trim(),
         celular: celular.trim(),
-        email: email.trim(),
+        email: email.trim() || null,
         fechaNacimiento: fechaNac || null,
         turno: turnoNuevo || null,
         estado: esSuperadmin ? estadoNuevo : "patrimonial",
         rol: esSuperadmin ? rolNuevo : "socio",
-        password: esSuperadmin ? passwordNuevo : "",
+        crearAcceso: false, // se registra el socio sin acceso — se activa después, aparte, desde "Gestionar → Crear acceso" (ahí sí es obligatorio el correo real)
       });
-      aviso.exito(`Socio ${nombre.trim()} registrado correctamente.`);
+      aviso.exito(`Socio ${nombre.trim()} registrado correctamente. Todavía no tiene acceso al sistema — actívaselo cuando quieras desde "Gestionar → Crear acceso".`);
       setNombre(""); setCelular(""); setEmail(""); setFechaNac(""); setTurnoNuevo(""); setEstadoNuevo("patrimonial"); setRolNuevo("socio"); setPasswordNuevo(""); setMostrarForm(false);
     } catch (err) {
       setError(err.message || "No se pudo registrar el socio.");
@@ -1326,8 +1325,8 @@ function Socios({ ctx, irAFicha }) {
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
             <Field label="Nombre completo"><input className="field-input" required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
             <Field label="Número de celular"><input className="field-input" required value={celular} onChange={(e) => setCelular(e.target.value)} /></Field>
-            <Field label="Correo electrónico (obligatorio — será su correo de acceso)">
-              <input className="field-input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Field label="Correo electrónico (opcional — se puede completar después, al activar su acceso)">
+              <input className="field-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </Field>
             <Field label="Fecha de nacimiento"><input className="field-input" type="date" value={fechaNac} onChange={(e) => setFechaNac(e.target.value)} /></Field>
             <Field label="Turno">
@@ -1348,16 +1347,17 @@ function Socios({ ctx, irAFicha }) {
                     {ROLES_ACCESO.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                   </select>
                 </Field>
-                <Field label="Contraseña (opcional, mínimo 6 caracteres)">
-                  <input className="field-input" placeholder="Si se deja vacío, será 123456" value={passwordNuevo} onChange={(e) => setPasswordNuevo(e.target.value)} />
-                </Field>
               </>
             ) : (
               <div style={{ gridColumn: "1 / -1", fontSize: "0.83rem", color: "var(--text-muted)", alignSelf: "end" }}>
-                El nuevo socio ingresará como <b>Patrimonial</b>, con rol <b>Socio</b> y contraseña por defecto <b>123456</b>. Solo un súper administrador puede cambiar esto.
+                El nuevo socio ingresará como <b>Patrimonial</b> con rol <b>Socio</b>. Solo un súper administrador puede cambiar esto.
               </div>
             )}
           </div>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 10 }}>
+            Este formulario solo registra al socio en el padrón — todavía no crea su cuenta de acceso.
+            Actívasela cuando quieras desde "Gestionar → Crear acceso" (ahí sí vas a necesitar su correo real).
+          </p>
           <div className="mt-4"><Btn onClick={handleSubmit} disabled={guardando}>{guardando ? "Guardando…" : "Guardar socio"}</Btn></div>
         </Card>
       )}

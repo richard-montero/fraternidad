@@ -365,11 +365,13 @@ Supabase puede llegar a restringir el envío de correos de todo el
 proyecto — no solo el temporal, también los reales.
 
 **La corrección:** se eliminó por completo la generación de correos
-temporales. Ahora, tanto en **"Nuevo socio"** como en **"Activar
-acceso"**, el correo real es **obligatorio** — no se puede dejar vacío.
-La importación desde Excel no cambia (nunca creó accesos en lote,
-seguirá siendo así), pero al activar el acceso de alguien más adelante,
-vas a necesitar su correo real desde ese momento.
+temporales. **"Nuevo socio" ya no crea la cuenta de acceso al mismo
+tiempo** — solo registra al socio en el padrón (el correo ahí es
+opcional, se puede completar después). El acceso se activa aparte,
+cuando quieras, desde **"Gestionar → Crear acceso"** — y ahí sí el
+correo real es obligatorio, porque en ese momento es cuando se crea de
+verdad la cuenta en Supabase. La importación desde Excel no cambia
+(nunca creó accesos en lote, seguirá siendo así).
 
 Las cuentas que ya habían quedado en "Primer ingreso pendiente" (con un
 correo temporal ya generado antes de este cambio) siguen funcionando
