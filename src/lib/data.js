@@ -95,34 +95,19 @@ export async function listarSocios() {
   return seleccionarTodo("socios", { orderBy: "nombre" });
 }
 
-// Genera un correo temporal a partir del celular (real o un número
-// inventado, ej. 70000001), para socios de los que aún no se conoce su
-// correo real.
-export function correoTemporalDesdeCelular(celular) {
-  // Supabase valida que el dominio del correo pueda recibir correo de
-  // verdad (revisa que tenga configurado un registro MX) — por eso un
-  // dominio inventado ("temporal.fraternidad") o incluso un dominio
-  // reservado sin correo real (example.com) quedan rechazados como
-  // "inválidos". gmail.com sí tiene esa configuración, así que el
-  // formato pasa la validación — nunca se envía nada ahí de verdad,
-  // porque la confirmación de correo está desactivada para el alta.
-  return `${celular.trim().replace(/\s+/g, "")}@gmail.com`;
-}
-
 export async function crearSocio({ nombre, celular, email, fechaNacimiento, turno, rol = "socio", estado = "patrimonial", password, crearAcceso = true }) {
   const celularLimpio = celular.trim();
   const correoReal = email?.trim();
 
+  if (crearAcceso && !correoReal) {
+    throw new Error("El correo electrónico es obligatorio para crear el acceso — ya no se generan correos temporales.");
+  }
+
   let authUserId = null;
-  let correoFinal = correoReal || null;
-  let requiereConfig = false;
 
   if (crearAcceso) {
-    const usaCorreoTemporal = !correoReal;
-    correoFinal = correoReal || correoTemporalDesdeCelular(celularLimpio);
     const passwordFinal = password && password.trim().length >= 6 ? password.trim() : "123456";
-    authUserId = await crearUsuarioDeAcceso(correoFinal, passwordFinal);
-    requiereConfig = usaCorreoTemporal;
+    authUserId = await crearUsuarioDeAcceso(correoReal, passwordFinal);
   }
 
   const { data, error } = await supabase
@@ -131,13 +116,13 @@ export async function crearSocio({ nombre, celular, email, fechaNacimiento, turn
       auth_user_id: authUserId,
       nombre: nombre.trim(),
       celular: celularLimpio,
-      email: correoFinal,
+      email: correoReal || null,
       fecha_nacimiento: fechaNacimiento || null,
       turno: turno || null,
       codigo: generarCodigoSocio(),
       estado,
       rol,
-      requiere_configuracion_inicial: requiereConfig,
+      requiere_configuracion_inicial: false,
     })
     .select()
     .single();
@@ -148,18 +133,21 @@ export async function crearSocio({ nombre, celular, email, fechaNacimiento, turn
 // Crea la cuenta de acceso (auth.users) para un socio que se registró
 // SIN una — por ejemplo, uno importado desde Excel. Se llama de a uno
 // por vez (nunca en lote), porque Supabase limita cuántas cuentas se
-// pueden crear por hora desde el correo integrado (ver README).
+// pueden crear por hora desde el correo integrado (ver README). Requiere
+// el correo real del socio — ya no se generan correos temporales (que
+// terminaban rebotando y afectando la reputación de envío del proyecto).
 export async function activarAccesoSocio(socioId, celular, { email, password }) {
   const correoReal = email?.trim();
-  const usaCorreoTemporal = !correoReal;
-  const correoFinal = correoReal || correoTemporalDesdeCelular(celular);
+  if (!correoReal) {
+    throw new Error("El correo electrónico es obligatorio para activar el acceso — ya no se generan correos temporales.");
+  }
   const passwordFinal = password && password.trim().length >= 6 ? password.trim() : "123456";
 
-  const authUserId = await crearUsuarioDeAcceso(correoFinal, passwordFinal);
+  const authUserId = await crearUsuarioDeAcceso(correoReal, passwordFinal);
 
   const { error } = await supabase
     .from("socios")
-    .update({ auth_user_id: authUserId, email: correoFinal, requiere_configuracion_inicial: usaCorreoTemporal })
+    .update({ auth_user_id: authUserId, email: correoReal, requiere_configuracion_inicial: false })
     .eq("id", socioId);
   if (error) throw error;
 }

@@ -336,6 +336,36 @@ externo).
 
 ---
 
+## 🆕 Se eliminó la generación de correos temporales
+
+Supabase empezó a avisar que estaba detectando una tasa alta de
+**correos rebotados** desde el proyecto — la causa era que, al activar
+el acceso de un socio dejando el correo vacío, se generaba
+automáticamente uno temporal (`<celular>@gmail.com`) que **no existe de
+verdad**, y cada intento de mandarle algo ahí (una confirmación, un
+restablecimiento de contraseña) rebotaba. Con suficientes rebotes,
+Supabase puede llegar a restringir el envío de correos de todo el
+proyecto — no solo el temporal, también los reales.
+
+**La corrección:** se eliminó por completo la generación de correos
+temporales. Ahora, tanto en **"Nuevo socio"** como en **"Activar
+acceso"**, el correo real es **obligatorio** — no se puede dejar vacío.
+La importación desde Excel no cambia (nunca creó accesos en lote,
+seguirá siendo así), pero al activar el acceso de alguien más adelante,
+vas a necesitar su correo real desde ese momento.
+
+Las cuentas que ya habían quedado en "Primer ingreso pendiente" (con un
+correo temporal ya generado antes de este cambio) siguen funcionando
+igual que antes — ese mecanismo no se tocó, solo se dejó de usar para
+cuentas nuevas.
+
+Revisa también que **"Confirm email"** esté desactivado en
+Authentication → Providers → Email (esto ya se explicó antes, pero es
+importante confirmarlo de nuevo si acabas de recibir el aviso de
+Supabase sobre rebotes).
+
+---
+
 ## 🆕 Nuevo rol: Pasivo
 
 **Paso 15:** en Supabase → SQL Editor, ejecuta `supabase/13_rol_pasivo.sql`.

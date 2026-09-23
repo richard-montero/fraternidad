@@ -1201,6 +1201,7 @@ function Socios({ ctx, irAFicha }) {
     e.preventDefault();
     setError(null);
     if (!celular.trim()) { setError("El número de celular es obligatorio."); return; }
+    if (!email.trim()) { setError("El correo electrónico es obligatorio."); return; }
     if (ctx.socios.some((s) => s.celular === celular.trim())) {
       setError("Ya existe un socio registrado con ese número de celular.");
       return;
@@ -1252,12 +1253,15 @@ function Socios({ ctx, irAFicha }) {
   }
 
   async function activarAcceso(socio) {
+    if (!correoActivar.trim()) {
+      setMensajeDetalle({ tipo: "error", texto: "El correo electrónico es obligatorio para activar el acceso." });
+      return;
+    }
     setActivando(true);
     setMensajeDetalle(null);
     try {
       await ctx.activarAccesoSocio(socio.id, socio.celular, { email: correoActivar, password: passwordActivar });
-      const correoUsado = correoActivar.trim() || api.correoTemporalDesdeCelular(socio.celular);
-      setMensajeDetalle({ tipo: "exito", texto: `Acceso creado. Correo: ${correoUsado} · Contraseña: ${passwordActivar.trim() || "123456"}` });
+      setMensajeDetalle({ tipo: "exito", texto: `Acceso creado. Correo: ${correoActivar.trim()} · Contraseña: ${passwordActivar.trim() || "123456"}` });
       aviso.exito(`Acceso creado para ${socio.nombre}.`);
     } catch (err) {
       setMensajeDetalle({ tipo: "error", texto: err.message || "No se pudo crear el acceso (revisa si llegaste al límite de cuentas por hora de Supabase)." });
@@ -1322,20 +1326,9 @@ function Socios({ ctx, irAFicha }) {
           <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
             <Field label="Nombre completo"><input className="field-input" required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
             <Field label="Número de celular"><input className="field-input" required value={celular} onChange={(e) => setCelular(e.target.value)} /></Field>
-            <div>
-              <Field label="Correo electrónico (opcional — déjalo vacío si no lo conoces)">
-                <input className="field-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </Field>
-              {!email.trim() ? (
-                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "4px 0 0" }}>
-                  {celular.trim()
-                    ? <>Se creará un correo temporal: <b className="monto">{api.correoTemporalDesdeCelular(celular)}</b>. En su primer ingreso, el socio define su correo real y su contraseña.</>
-                    : "Sin correo ni celular, no se puede generar un correo temporal — completa al menos el celular."}
-                </p>
-              ) : (
-                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "4px 0 0" }}>Este será su correo de acceso desde ya (no pasará por la pantalla de primer ingreso).</p>
-              )}
-            </div>
+            <Field label="Correo electrónico (obligatorio — será su correo de acceso)">
+              <input className="field-input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            </Field>
             <Field label="Fecha de nacimiento"><input className="field-input" type="date" value={fechaNac} onChange={(e) => setFechaNac(e.target.value)} /></Field>
             <Field label="Turno">
               <select className="field-input" value={turnoNuevo} onChange={(e) => setTurnoNuevo(e.target.value)}>
@@ -1442,8 +1435,8 @@ function Socios({ ctx, irAFicha }) {
                                   Créala aquí de a una — nunca en lote, porque Supabase limita cuántas cuentas se pueden crear por hora.
                                 </p>
                                 <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
-                                  <Field label="Correo real (opcional — vacío = correo temporal)">
-                                    <input className="field-input" type="email" placeholder={api.correoTemporalDesdeCelular(s.celular)} value={correoActivar} onChange={(e) => setCorreoActivar(e.target.value)} />
+                                  <Field label="Correo real (obligatorio)">
+                                    <input className="field-input" type="email" required value={correoActivar} onChange={(e) => setCorreoActivar(e.target.value)} />
                                   </Field>
                                   <Field label="Contraseña inicial (opcional, mín. 6 — vacío = 123456)">
                                     <input className="field-input" value={passwordActivar} onChange={(e) => setPasswordActivar(e.target.value)} />
