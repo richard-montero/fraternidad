@@ -194,7 +194,7 @@ export async function cambiarRolSocio(socioId, nuevoRol) {
 export async function editarSocio(socioId, { nombre, celular, email, fechaNacimiento, turno }) {
   const { error } = await supabase
     .from("socios")
-    .update({ nombre: nombre.trim(), celular: celular.trim(), email: email.trim(), fecha_nacimiento: fechaNacimiento || null, turno: turno || null })
+    .update({ nombre: nombre.trim(), celular: celular.trim(), email: email.trim() || null, fecha_nacimiento: fechaNacimiento || null, turno: turno || null })
     .eq("id", socioId);
   if (error) throw error;
 }

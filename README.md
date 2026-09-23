@@ -336,6 +336,23 @@ externo).
 
 ---
 
+## 🆕 Corrección: "duplicate key value violates unique constraint socios_email_key"
+
+**Paso 16:** en Supabase → SQL Editor, ejecuta
+`supabase/14_limpiar_correo_vacio.sql`.
+
+**La causa:** al editar los datos de un socio sin correo (dejando el
+campo vacío), la aplicación lo guardaba como texto vacío (`''`) en vez
+de "sin valor" (`NULL`). Como la columna exige que los correos sean
+únicos, el **segundo** socio que se guardara sin correo chocaba contra
+el primero que ya había quedado con `''` ahí — de ahí el error.
+
+**La corrección:** ya se arregló en el código (ahora un correo vacío se
+guarda correctamente como "sin valor"), y el script de arriba limpia
+los que ya habían quedado mal guardados de antes.
+
+---
+
 ## 🆕 Se eliminó la generación de correos temporales
 
 Supabase empezó a avisar que estaba detectando una tasa alta de
