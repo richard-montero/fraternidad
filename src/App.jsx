@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useState, Fragment, cloneElemen
 import {
   LayoutDashboard, Users, ArrowDownCircle, ArrowUpCircle, BarChart3,
   Settings, LogOut, Plus, X, ChevronRight, ChevronUp, ChevronDown, Paperclip, Check,
-  Menu, Eye, EyeOff, Trash2, Download, Printer, Pencil, AlertCircle, QrCode, Cake, KeyRound,
+  Menu, Eye, EyeOff, Trash2, Download, Printer, Pencil, AlertCircle, QrCode, Cake, KeyRound, Search,
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient.js";
 import * as api from "./lib/data.js";
@@ -224,6 +224,7 @@ export default function App() {
   const NAV_ADMIN = [
     { id: "dashboard", label: "Panel general", icon: LayoutDashboard },
     { id: "socios", label: "Socios", icon: Users },
+    { id: "lista_socios", label: "Lista de socios", icon: Search },
     { id: "pagar_qr", label: "Pagar con QR", icon: QrCode },
     { id: "ingresos", label: "Libro de ingresos", icon: ArrowDownCircle },
     { id: "gastos", label: "Libro de gastos", icon: ArrowUpCircle },
@@ -269,6 +270,7 @@ export default function App() {
           {vistaEfectiva === "socios" && verAdmin && (
             <Socios ctx={ctx} irAFicha={(id) => { setSocioSeleccionado(id); setVista("ficha"); }} />
           )}
+          {vistaEfectiva === "lista_socios" && verAdmin && <ListaSocios ctx={ctx} />}
           {vistaEfectiva === "ficha" && !esPasivo && (
             <FichaSocio
               ctx={ctx}
@@ -1150,6 +1152,81 @@ function Cumpleanos({ ctx }) {
                 </span>
               </div>
             ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// =====================================================================
+// LISTA DE SOCIOS — buscador rápido, solo lectura
+// =====================================================================
+function fdateCorto(f) {
+  if (!f) return "—";
+  const d = new Date(f + "T00:00:00");
+  const dia = String(d.getDate()).padStart(2, "0");
+  const mes = TURNOS[d.getMonth()];
+  return `${dia}-${mes}-${d.getFullYear()}`;
+}
+
+function ListaSocios({ ctx }) {
+  const [busqueda, setBusqueda] = useState("");
+
+  const filtrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    const base = q
+      ? ctx.socios.filter((s) =>
+          s.nombre.toLowerCase().includes(q) ||
+          s.celular.includes(q) ||
+          (s.turno || "").toLowerCase().includes(q)
+        )
+      : ctx.socios;
+    return base.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }, [ctx.socios, busqueda]);
+
+  return (
+    <div>
+      <PageHeader title="Lista de socios" subtitle="Busca por nombre, celular o turno." />
+
+      <div className="mb-5" style={{ maxWidth: 340 }}>
+        <Field label="Buscar">
+          <input
+            className="field-input"
+            placeholder="Nombre, celular o turno…"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </Field>
+      </div>
+
+      <Card>
+        {filtrados.length === 0 ? (
+          <Vacio>No hay socios que coincidan con la búsqueda.</Vacio>
+        ) : (
+          <div className="ledger-wrap">
+            <table className="ledger">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Nombre</th>
+                  <th>Celular</th>
+                  <th>Fecha de nacimiento</th>
+                  <th>Turno</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.map((s, i) => (
+                  <tr key={s.id}>
+                    <td className="monto" style={{ color: "var(--text-muted)" }}>{i + 1}</td>
+                    <td>{s.nombre}</td>
+                    <td>{s.celular}</td>
+                    <td>{fdateCorto(s.fecha_nacimiento)}</td>
+                    <td>{s.turno || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </Card>
