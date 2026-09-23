@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useState, Fragment, cloneElemen
 import {
   LayoutDashboard, Users, ArrowDownCircle, ArrowUpCircle, BarChart3,
   Settings, LogOut, Plus, X, ChevronRight, ChevronUp, ChevronDown, Paperclip, Check,
-  Menu, Eye, EyeOff, Trash2, Download, Printer, Pencil, AlertCircle, QrCode, Cake, KeyRound, Search,
+  Menu, Eye, EyeOff, Trash2, Download, Printer, Pencil, AlertCircle, QrCode, Cake, KeyRound, Search, FileText,
 } from "lucide-react";
 import { supabase } from "./lib/supabaseClient.js";
 import * as api from "./lib/data.js";
@@ -974,14 +974,25 @@ function DashboardSocio({ ctx, irASocio }) {
         <StatCard label="Saldo pendiente — Aporte patrimonial" value={bs(sp)} tono={sp > 0 ? "negativo" : "positivo"} />
         <StatCard label="Saldo pendiente — Aportes mensuales" value={bs(sm)} tono={sm > 0 ? "negativo" : "positivo"} />
       </div>
-      <Card>
-        <p style={{ margin: 0 }}>
-          Para ver el detalle completo de cada cuenta (Debe, Haber y movimientos), visita{" "}
-          <span style={{ color: "var(--ink)", textDecoration: "underline", cursor: "pointer", fontWeight: 600 }} onClick={() => irASocio(id)}>
-            tu ficha de socio
-          </span>.
-        </p>
-      </Card>
+      <div
+        onClick={() => irASocio(id)}
+        className="flex items-center justify-between gap-3"
+        style={{
+          background: "var(--gold-bg)", border: "1px solid var(--gold)", borderRadius: 10,
+          padding: "18px 22px", cursor: "pointer",
+        }}
+      >
+        <div className="flex items-center gap-3.5">
+          <div style={{ width: 44, height: 44, borderRadius: 10, background: "var(--ink)", color: "var(--gold)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <FileText size={21} />
+          </div>
+          <div>
+            <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: "var(--ink)", fontSize: "1.05rem" }}>Ver mi ficha completa</div>
+            <div style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: 2 }}>Detalle de cada cuenta: Debe, Haber y todos los movimientos</div>
+          </div>
+        </div>
+        <ChevronRight size={22} style={{ color: "var(--ink)", flexShrink: 0 }} />
+      </div>
     </div>
   );
 }
