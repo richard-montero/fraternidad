@@ -239,15 +239,15 @@ export default function App() {
     { id: "turno_cumple", label: "Turno/Cumpleaños", icon: Cake },
   ];
   const NAV_PASIVO = [
+    { id: "lista_socios", label: "Lista de socios", icon: Search },
     { id: "pagar_qr", label: "Pagar con QR", icon: QrCode },
     { id: "turno_cumple", label: "Turno/Cumpleaños", icon: Cake },
   ];
   const items = verAdmin ? NAV_ADMIN : esPasivo ? NAV_PASIVO : NAV_SOCIO;
-  // Un socio "Pasivo" no tiene Panel general, Ficha propia ni Lista de
-  // socios — si por alguna razón la vista quedó en una de esas (por
-  // ejemplo, es la que trae por defecto al recargar la página), lo
-  // mandamos a Pagar con QR.
-  const vistaEfectiva = esPasivo && (vista === "dashboard" || vista === "ficha" || vista === "lista_socios") ? "pagar_qr" : vista;
+  // Un socio "Pasivo" no tiene Panel general ni Ficha propia — si por
+  // alguna razón la vista quedó en una de esas (por ejemplo, es la que
+  // trae por defecto al recargar la página), lo mandamos a Pagar con QR.
+  const vistaEfectiva = esPasivo && (vista === "dashboard" || vista === "ficha") ? "pagar_qr" : vista;
   const tituloVista = items.find((i) => i.id === vistaEfectiva)?.label || "Ficha de socio";
 
   return (
@@ -272,7 +272,7 @@ export default function App() {
           {vistaEfectiva === "socios" && verAdmin && (
             <Socios ctx={ctx} irAFicha={(id) => { setSocioSeleccionado(id); setVista("ficha"); }} />
           )}
-          {vistaEfectiva === "lista_socios" && !esPasivo && <ListaSocios ctx={ctx} />}
+          {vistaEfectiva === "lista_socios" && <ListaSocios ctx={ctx} />}
           {vistaEfectiva === "ficha" && !esPasivo && (
             <FichaSocio
               ctx={ctx}
