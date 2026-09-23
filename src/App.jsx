@@ -943,11 +943,33 @@ function DashboardAdmin({ ctx }) {
 
 function DashboardSocio({ ctx, irASocio }) {
   const id = ctx.sesion.id;
+  const socio = ctx.socios.find((s) => s.id === id) || ctx.sesion;
   const sp = ctx.saldoPatrimonial(id);
   const sm = ctx.saldoMensual(id);
   return (
     <div>
-      <PageHeader title="Mi resumen" subtitle={`Bienvenido, ${ctx.sesion.nombre}. Aquí ves el estado de tus dos cuentas individuales.`} />
+      <PageHeader
+        title="Mi resumen"
+        subtitle={`Bienvenido, ${ctx.sesion.nombre}. Aquí ves el estado de tus dos cuentas individuales.`}
+        right={
+          <Btn
+            variante="secondary"
+            icon={Download}
+            onClick={() => generarEstadoCuentaPDF({
+              nombreFraternidad: ctx.nombreFraternidad,
+              socio,
+              movP: ctx.movPatrimoniales[id] || [],
+              movM: ctx.movMensuales[id] || [],
+              aportesVol: ctx.aportesVoluntarios.filter((a) => a.socio_id === id),
+              acordadoPatrimonial: ctx.obligPatrimoniales[id] || 0,
+              saldoPatrimonial: sp,
+              saldoMensual: sm,
+            })}
+          >
+            Estado de cuenta (PDF)
+          </Btn>
+        }
+      />
       <div className="grid gap-3.5 mb-6" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <StatCard label="Saldo pendiente — Aporte patrimonial" value={bs(sp)} tono={sp > 0 ? "negativo" : "positivo"} />
         <StatCard label="Saldo pendiente — Aportes mensuales" value={bs(sm)} tono={sm > 0 ? "negativo" : "positivo"} />
