@@ -77,6 +77,18 @@ function tonoEstado(estado) {
   return "gris";
 }
 
+// Estilo compartido por TODAS las barras de pestañas de la app: la
+// pestaña activa se resalta con fondo sólido (igual que "Resumen
+// general" en la ficha del socio), en vez de un simple subrayado.
+function estiloPestana(activa) {
+  return {
+    background: activa ? "var(--ink)" : "none",
+    border: "none", borderRadius: 6,
+    padding: "9px 16px", fontWeight: 600, fontSize: "0.88rem", whiteSpace: "nowrap",
+    color: activa ? "#fff" : "var(--text-muted)", cursor: "pointer",
+  };
+}
+
 // =====================================================================
 // AVISOS (toasts) — bus mínimo sin dependencias
 // =====================================================================
@@ -1007,16 +1019,12 @@ function PagarQR({ ctx }) {
     <div>
       <PageHeader title="Pagar con QR" subtitle="Escanea el código correspondiente desde tu app bancaria para realizar tu pago." />
 
-      <div className="flex gap-1 mb-5" style={{ borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
+      <div className="flex gap-1.5 mb-5" style={{ paddingBottom: 10, borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
         {[["mensual", "Obligaciones Mensuales"], ["alquiler", "Alquiler / Uso fraternidad"], ["patrimonial", "Patrimonial"]].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            style={{
-              background: "none", border: "none", padding: "10px 16px", fontWeight: 600, fontSize: "0.88rem", whiteSpace: "nowrap",
-              color: tab === id ? "var(--ink)" : "var(--text-muted)", cursor: "pointer",
-              borderBottom: tab === id ? "2px solid var(--gold)" : "2px solid transparent", marginBottom: -1,
-            }}
+            style={estiloPestana(tab === id)}
           >
             {label}
           </button>
@@ -1092,16 +1100,12 @@ function TurnoCumpleanos({ ctx }) {
     <div>
       <PageHeader title="Turno/Cumpleaños" subtitle="Consulta quién tiene el turno o cumple años en cada mes." />
 
-      <div className="flex gap-1 mb-5" style={{ borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
+      <div className="flex gap-1.5 mb-5" style={{ paddingBottom: 10, borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
         {[["turnos", "Turneros"], ["cumpleanos", "Cumpleaños"]].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            style={{
-              background: "none", border: "none", padding: "10px 16px", fontWeight: 600, fontSize: "0.88rem", whiteSpace: "nowrap",
-              color: tab === id ? "var(--ink)" : "var(--text-muted)", cursor: "pointer",
-              borderBottom: tab === id ? "2px solid var(--gold)" : "2px solid transparent", marginBottom: -1,
-            }}
+            style={estiloPestana(tab === id)}
           >
             {label}
           </button>
@@ -1522,16 +1526,12 @@ function Socios({ ctx, irAFicha }) {
                       <tr>
                         <td colSpan={7} style={{ background: "var(--paper)", borderBottom: "1px solid var(--line)" }}>
                           <div style={{ padding: "16px 4px" }}>
-                            <div className="flex gap-1 mb-4" style={{ borderBottom: "1px solid var(--line-strong)" }}>
+                            <div className="flex gap-1.5 mb-4" style={{ paddingBottom: 10, borderBottom: "1px solid var(--line-strong)" }}>
                               {["datos", ...(!s.auth_user_id ? ["crear_acceso"] : []), ...(esSuperadmin ? ["acceso"] : [])].map((t) => (
                                 <button
                                   key={t}
                                   onClick={() => { setTabDetalle(t); setMensajeDetalle(null); }}
-                                  style={{
-                                    background: "none", border: "none", padding: "8px 14px", fontWeight: 600, fontSize: "0.85rem",
-                                    color: tabDetalle === t ? "var(--ink)" : "var(--text-muted)", cursor: "pointer",
-                                    borderBottom: tabDetalle === t ? "2px solid var(--gold)" : "2px solid transparent", marginBottom: -1,
-                                  }}
+                                  style={estiloPestana(tabDetalle === t)}
                                 >
                                   {t === "datos" ? "Editar datos" : t === "crear_acceso" ? "Crear acceso" : "Estado y rol de acceso"}
                                 </button>
@@ -1665,16 +1665,12 @@ function FichaSocio({ ctx, socioId, volver }) {
         </div>
       </div>
 
-      <div className="flex gap-1 mb-5 no-print" style={{ borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
+      <div className="flex gap-1.5 mb-5 no-print" style={{ paddingBottom: 10, borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
         {[["general", "Resumen general"], ["patrimonial", "Aporte patrimonial"], ["mensual", "Aportes mensuales"], ["voluntario", "Aportes voluntarios"]].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            style={{
-              background: "none", border: "none", padding: "10px 16px", fontWeight: 600, fontSize: "0.88rem", whiteSpace: "nowrap",
-              color: tab === id ? "var(--ink)" : "var(--text-muted)", cursor: "pointer",
-              borderBottom: tab === id ? "2px solid var(--gold)" : "2px solid transparent", marginBottom: -1,
-            }}
+            style={estiloPestana(tab === id)}
           >
             {label}
           </button>
@@ -2106,17 +2102,13 @@ function Ingresos({ ctx }) {
         <Card style={{ marginBottom: 20 }}>
           <h3 style={{ fontFamily: "var(--font-display)", color: "var(--ink)", marginTop: 0 }}>Registrar ingreso</h3>
 
-          <div className="flex gap-1 mb-4" style={{ borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
+          <div className="flex gap-1.5 mb-4" style={{ paddingBottom: 10, borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
             {TIPOS_INGRESO.map((t) => (
               <button
                 key={t.value}
                 type="button"
                 onClick={() => cambiarTipo(t.value)}
-                style={{
-                  background: "none", border: "none", padding: "9px 14px", fontWeight: 600, fontSize: "0.85rem", whiteSpace: "nowrap",
-                  color: tipo === t.value ? "var(--ink)" : "var(--text-muted)", cursor: "pointer",
-                  borderBottom: tipo === t.value ? "2px solid var(--gold)" : "2px solid transparent", marginBottom: -1,
-                }}
+                style={estiloPestana(tipo === t.value)}
               >
                 {t.label}
               </button>
@@ -2489,16 +2481,12 @@ function Reportes({ ctx }) {
         right={<Btn variante="secondary" icon={Printer} onClick={() => window.print()}>Imprimir / PDF</Btn>}
       />
 
-      <div className="flex gap-1 mb-5 no-print" style={{ borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
+      <div className="flex gap-1.5 mb-5 no-print" style={{ paddingBottom: 10, borderBottom: "1px solid var(--line-strong)", overflowX: "auto" }}>
         {REPORTES_TABS.map(([id, label]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            style={{
-              background: "none", border: "none", padding: "9px 14px", fontWeight: 600, fontSize: "0.85rem", whiteSpace: "nowrap",
-              color: tab === id ? "var(--ink)" : "var(--text-muted)", cursor: "pointer",
-              borderBottom: tab === id ? "2px solid var(--gold)" : "2px solid transparent", marginBottom: -1,
-            }}
+            style={estiloPestana(tab === id)}
           >
             {label}
           </button>
