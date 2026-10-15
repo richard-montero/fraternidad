@@ -886,3 +886,6 @@ tocar el código.
 7. Publicar la carpeta `dist` (o conectar tu repositorio de GitHub).
 
 Y listo — la aplicación queda funcionando con tu propia base de datos.
+
+## iPhone (app instalada): barra de estado
+El encabezado móvil y el menú lateral respetan ahora el área segura de iOS (`env(safe-area-inset-*)`), por lo que el botón de las tres líneas ya no queda debajo de la barra de estado (hora/batería). El botón tiene un área táctil de 44 px.

@@ -270,12 +270,12 @@ export default function App() {
       <Sidebar sesion={sesion} vista={vistaEfectiva} items={items} irA={irA} onSalir={cerrarSesion} abierto={menuAbierto} cerrar={() => setMenuAbierto(false)} nombreFraternidad={nombreFraternidad} />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="md:hidden no-print flex items-center justify-between px-4 py-3 sticky top-0" style={{ background: "var(--ink)", color: "#fff", zIndex: 30 }}>
-          <button className="btn-ghost" style={{ color: "#fff", padding: 4 }} onClick={() => setMenuAbierto(true)} aria-label="Abrir menú">
+        <header className="md:hidden no-print flex items-center justify-between px-4 pb-3 sticky top-0" style={{ background: "var(--ink)", color: "#fff", zIndex: 30, paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}>
+          <button className="btn-ghost" style={{ color: "#fff", padding: 10, margin: -6, minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => setMenuAbierto(true)} aria-label="Abrir menú">
             <Menu size={22} />
           </button>
           <span style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem" }}>{tituloVista}</span>
-          <span style={{ width: 22 }} />
+          <span style={{ width: 32 }} />
         </header>
 
         <main className="flex-1 w-full px-4 py-6 sm:px-8 sm:py-10" style={{ maxWidth: 1180 }}>
@@ -508,7 +508,7 @@ function Sidebar({ sesion, vista, items, irA, onSalir, abierto, cerrar, nombreFr
   const [modalPassword, setModalPassword] = useState(false);
 
   const contenido = (
-    <div className="flex flex-col gap-6 h-full" style={{ width: "var(--sidebar-w)", background: "var(--ink)", color: "#e2ece5", padding: "24px 16px" }}>
+    <div className="flex flex-col gap-6 h-full" style={{ width: "var(--sidebar-w)", background: "var(--ink)", color: "#e2ece5", padding: "calc(24px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px))", boxSizing: "border-box" }}>
       <div className="flex items-center justify-between">
         <div style={{ fontFamily: "var(--font-display)", fontSize: "1.15rem", color: "#fff" }}>
           {nombreFraternidad}
