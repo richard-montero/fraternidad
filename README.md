@@ -889,3 +889,6 @@ Y listo — la aplicación queda funcionando con tu propia base de datos.
 
 ## iPhone (app instalada): barra de estado
 El encabezado móvil y el menú lateral respetan ahora el área segura de iOS (`env(safe-area-inset-*)`), por lo que el botón de las tres líneas ya no queda debajo de la barra de estado (hora/batería). El botón tiene un área táctil de 44 px.
+
+## Saldo a favor del socio (Aportes mensuales)
+En el Resumen general (inciso 2) y en el mayor «Aportes mensuales» se separa el saldo: si Debe − Haber es positivo se muestra como «Saldo pendiente» (y el saldo a favor es 0); si es negativo se muestra como «Saldo a favor socio» (y el pendiente es 0). El mayor tiene una columna nueva «Saldo a favor».

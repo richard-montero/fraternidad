@@ -1734,7 +1734,8 @@ function FichaGeneral({ ctx, socio }) {
         <div className="grid gap-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))" }}>
           <StatCard label="Total generado" value={bs(generadoM)} />
           <StatCard label="Total pagado" value={bs(pagadoM)} tono="positivo" />
-          <StatCard label="Saldo pendiente" value={bs(saldoM)} tono={saldoM > 0 ? "negativo" : "positivo"} />
+          <StatCard label="Saldo pendiente" value={bs(Math.max(saldoM, 0))} tono={saldoM > 0 ? "negativo" : "positivo"} />
+          <StatCard label="Saldo a favor socio" value={bs(Math.max(-saldoM, 0))} tono="positivo" />
         </div>
       </Card>
       <Card>
@@ -1751,7 +1752,7 @@ function FichaGeneral({ ctx, socio }) {
   );
 }
 
-function LedgerConSaldo({ movimientos }) {
+function LedgerConSaldo({ movimientos, conFavor = false }) {
   let acumulado = 0;
   const filas = movimientos.map((m) => {
     acumulado += Number(m.debe) - Number(m.haber);
@@ -1764,7 +1765,7 @@ function LedgerConSaldo({ movimientos }) {
   return (
     <div className="ledger-wrap">
       <table className="ledger">
-        <thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Debe</th><th className="num">Haber</th><th className="num">Saldo</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Concepto</th><th className="num">Debe</th><th className="num">Haber</th><th className="num">{conFavor ? "Saldo pendiente" : "Saldo"}</th>{conFavor && <th className="num">Saldo a favor</th>}</tr></thead>
         <tbody>
           {filasParaMostrar.map((f) => (
             <tr key={f.id}>
@@ -1772,12 +1773,13 @@ function LedgerConSaldo({ movimientos }) {
               <td>{f.concepto}</td>
               <td className="num monto">{f.debe > 0 ? bs(f.debe) : "—"}</td>
               <td className="num monto">{f.haber > 0 ? bs(f.haber) : "—"}</td>
-              <td className="num monto">{bs(f.saldo)}</td>
+              <td className="num monto">{bs(conFavor ? Math.max(f.saldo, 0) : f.saldo)}</td>
+              {conFavor && <td className="num monto">{bs(Math.max(-f.saldo, 0))}</td>}
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr><td colSpan={2}>Total</td><td className="num monto">{bs(totalDebe)}</td><td className="num monto">{bs(totalHaber)}</td><td className="num monto">{bs(totalDebe - totalHaber)}</td></tr>
+          <tr><td colSpan={2}>Total</td><td className="num monto">{bs(totalDebe)}</td><td className="num monto">{bs(totalHaber)}</td><td className="num monto">{bs(conFavor ? Math.max(totalDebe - totalHaber, 0) : totalDebe - totalHaber)}</td>{conFavor && <td className="num monto">{bs(Math.max(totalHaber - totalDebe, 0))}</td>}</tr>
         </tfoot>
       </table>
     </div>
@@ -1901,7 +1903,8 @@ function FichaMensual({ ctx, socio, esAdmin }) {
       <div className="grid gap-3.5 mb-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
         <StatCard label="Meses con obligación generada" value={generados} />
         <StatCard label="Pagos registrados" value={pagos} />
-        <StatCard label="Saldo pendiente" value={bs(totalDebe - totalHaber)} tono={totalDebe - totalHaber > 0 ? "negativo" : "positivo"} />
+        <StatCard label="Saldo pendiente" value={bs(Math.max(totalDebe - totalHaber, 0))} tono={totalDebe - totalHaber > 0 ? "negativo" : "positivo"} />
+        <StatCard label="Saldo a favor socio" value={bs(Math.max(totalHaber - totalDebe, 0))} tono="positivo" />
       </div>
 
       {esAdmin && (
@@ -1919,7 +1922,7 @@ function FichaMensual({ ctx, socio, esAdmin }) {
       <Card>
         {movs.length === 0 ? (
           <Vacio>Aún no hay mensualidades generadas para este socio. Genéralas desde «Configuración anual».</Vacio>
-        ) : <LedgerConSaldo movimientos={movs} />}
+        ) : <LedgerConSaldo movimientos={movs} conFavor />}
       </Card>
     </div>
   );
